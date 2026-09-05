@@ -71,8 +71,8 @@ const sessionsStore: Map<string, Session> = new Map();
 const initialSeedUsers: Omit<StoredUser, "salt" | "passwordHash" | "createdAt">[] = [
   {
     id: "usr-01",
-    name: "Alex Vance",
-    email: "alex.vance@worqester.internal",
+    name: "Suman Madugula",
+    email: "suman.madugula@worqester.internal",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
     role: "Admin",
     department: "Executive Management",

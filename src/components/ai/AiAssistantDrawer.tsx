@@ -66,9 +66,13 @@ export const AiAssistantDrawer: React.FC = () => {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem("token") || localStorage.getItem("worqester_auth_token");
       const response = await fetch("/api/ai/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           prompt: promptToSend,
           context: {
@@ -89,10 +93,11 @@ export const AiAssistantDrawer: React.FC = () => {
       }
 
       const data = await response.json();
+      const answerContent = data.reply || data.answer || data.text || "Executive intelligence briefing generated.";
       const aiReply: Message = {
         id: `ai-${Date.now()}`,
         sender: "ai",
-        text: data.reply,
+        text: answerContent,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, aiReply]);

@@ -112,11 +112,33 @@ export const GlobalCreateModal: React.FC = () => {
         nextFollowUp: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
       });
     } else if (activeType === "deal") {
-      const selectedComp = companies.find((c) => c.id === dealCompanyId) || companies[0];
+      let selectedComp = companies.find((c) => c.id === dealCompanyId) || companies[0];
+      if (!selectedComp) {
+        // Auto-provision initial company if workspace has zero companies
+        const defaultCompany = {
+          name: leadCompany || "Primary Enterprise Account",
+          industry: "Technology",
+          revenue: 10000000,
+          employeesCount: 50,
+          country: "India",
+          status: "Active" as const,
+          primaryContact: currentUser.name,
+          tier: "Tier 1" as const,
+        };
+        createCompany(defaultCompany);
+        selectedComp = {
+          id: "comp-default",
+          name: defaultCompany.name,
+          ...defaultCompany,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          organizationId: currentUser.organizationId || "org-01",
+        };
+      }
       createDeal({
         name: dealName || "Enterprise Platform Expansion Deal",
-        companyId: selectedComp.id,
-        companyName: selectedComp.name,
+        companyId: selectedComp?.id || "comp-default",
+        companyName: selectedComp?.name || "Primary Enterprise Account",
         contactId: "cont-01",
         contactName: "Lead Stakeholder",
         ownerId: currentUser.id,
@@ -124,7 +146,7 @@ export const GlobalCreateModal: React.FC = () => {
         stage: dealStage,
         amount: Number(dealAmount) || 3000000,
         probability: dealStage === "Closed Won" ? 100 : 50,
-        expectedCloseDate: dealExpectedClose,
+        expectedCloseDate: dealExpectedClose || new Date().toISOString().split("T")[0],
         priority: "High",
         source: "Inbound Expansion",
       });
@@ -146,13 +168,33 @@ export const GlobalCreateModal: React.FC = () => {
         description: projectDesc || "Initiated from executive dashboard.",
       });
     } else if (activeType === "task") {
-      const selectedProj = projects.find((p) => p.id === taskProjectId) || projects[0];
+      let selectedProj = projects.find((p) => p.id === taskProjectId) || projects[0];
+      if (!selectedProj) {
+        // Auto-provision default project if workspace has zero projects
+        const defaultProjData = {
+          name: "Core Operational Deliverables",
+          code: "PRJ-CORE",
+          projectManagerId: currentUser.id,
+          projectManagerName: currentUser.name,
+          teamMemberIds: [currentUser.id],
+          startDate: new Date().toISOString().split("T")[0],
+          endDate: "2026-12-31",
+          priority: "High" as const,
+          status: "In Progress" as const,
+          health: "Healthy" as const,
+          budget: 2500000,
+          spent: 0,
+          progress: 0,
+          description: "Default workspace operational project container.",
+        };
+        selectedProj = createProject(defaultProjData);
+      }
       const selectedUser = employees.find((e) => e.id === taskAssigneeId) || employees[0];
       createTask({
         title: taskTitle || "Execute Deliverable Milestones",
         description: "Task created from quick action modal.",
-        projectId: selectedProj.id,
-        projectName: selectedProj.name,
+        projectId: selectedProj?.id || "prj-default",
+        projectName: selectedProj?.name || "Core Operational Deliverables",
         assigneeId: selectedUser?.id || currentUser.id,
         assigneeName: selectedUser?.fullName || currentUser.name,
         assigneeAvatar: selectedUser?.avatar || currentUser.avatar,
@@ -161,7 +203,7 @@ export const GlobalCreateModal: React.FC = () => {
         priority: taskPriority,
         status: "To Do",
         labels: ["Core", "SLA-Active"],
-        dueDate: taskDueDate,
+        dueDate: taskDueDate || new Date().toISOString().split("T")[0],
         estimatedHours: Number(taskHours) || 8,
         actualHours: 0,
       });
@@ -285,11 +327,15 @@ export const GlobalCreateModal: React.FC = () => {
                   onChange={(e) => setTaskProjectId(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
                 >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
+                  {projects.length === 0 ? (
+                    <option value="">(Auto-create Core Operational Project)</option>
+                  ) : (
+                    projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               <div>
@@ -436,11 +482,15 @@ export const GlobalCreateModal: React.FC = () => {
                   onChange={(e) => setDealCompanyId(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
                 >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
+                  {companies.length === 0 ? (
+                    <option value="">(Auto-create Primary Enterprise Account)</option>
+                  ) : (
+                    companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               <div>

@@ -19,8 +19,12 @@ import {
   CalendarDays,
   Filter,
   Check,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Task } from "../types";
+import { EditTaskModal } from "../components/modals/EditModals";
 
 export const TasksView: React.FC = () => {
   const {
@@ -36,6 +40,10 @@ export const TasksView: React.FC = () => {
     toggleTaskCompletion,
     setTaskDueDate,
   } = useApp();
+
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [calendarYear, setCalendarYear] = useState<number>(2026);
+  const [calendarMonth, setCalendarMonth] = useState<number>(8); // September (0-indexed)
 
   const activeSubView = currentSubView || "kanban";
   const [filterProject, setFilterProject] = useState<string>("all");
@@ -221,6 +229,14 @@ export const TasksView: React.FC = () => {
               }`}
             >
               {isDone ? "Reopen" : "Complete"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingTask(t)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+              title="Edit task"
+            >
+              <Pencil size={13} />
             </button>
             <button
               type="button"
@@ -546,15 +562,24 @@ export const TasksView: React.FC = () => {
                               <span />
                             )}
 
-                            {/* Delete Button */}
-                            <button
-                              type="button"
-                              onClick={() => deleteItem("task", task.id)}
-                              className="text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
-                              title="Delete task"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setEditingTask(task)}
+                                className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                title="Edit task"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteItem("task", task.id)}
+                                className="text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Delete task"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
 
                             {/* Next Status Button */}
                             {col !== "Done" ? (
@@ -595,78 +620,241 @@ export const TasksView: React.FC = () => {
         />
       )}
 
-      {/* VIEW: DEADLINES CALENDAR */}
-      {activeSubView === "calendar" && (
-        <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-xs space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Task Deadlines & Schedule Calendar</h3>
-              <p className="text-xs text-slate-500">Upcoming deliverables grouped by targeted completion date</p>
-            </div>
-            <span className="text-xs font-mono text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-              {filteredTasks.length} Active Tasks
-            </span>
-          </div>
+      {/* VIEW: DEADLINES CALENDAR (7-COLUMN MONTH GRID) */}
+      {activeSubView === "calendar" && (() => {
+        const monthNames = [
+          "January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"
+        ];
+        const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+        const firstDayOfWeek = new Date(calendarYear, calendarMonth, 1).getDay(); // 0 = Sun
+        
+        const daysArray: (number | null)[] = [];
+        for (let i = 0; i < firstDayOfWeek; i++) {
+          daysArray.push(null);
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+          daysArray.push(d);
+        }
 
-          <div className="space-y-3">
-            {filteredTasks
-              .slice()
-              .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))
-              .map((t) => {
-                const isDone = t.status === "Done";
-                return (
-                  <div
-                    key={t.id}
-                    className={`p-3.5 rounded-xl border flex items-center justify-between text-xs transition-colors ${
-                      isDone
-                        ? "bg-slate-50/70 border-slate-200 text-slate-400"
-                        : "bg-white border-slate-200 hover:border-slate-300 text-slate-900"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => toggleTaskCompletion(t.id)}
-                        className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+        const handlePrevMonth = () => {
+          if (calendarMonth === 0) {
+            setCalendarMonth(11);
+            setCalendarYear((y) => y - 1);
+          } else {
+            setCalendarMonth((m) => m - 1);
+          }
+        };
+
+        const handleNextMonth = () => {
+          if (calendarMonth === 11) {
+            setCalendarMonth(0);
+            setCalendarYear((y) => y + 1);
+          } else {
+            setCalendarMonth((m) => m + 1);
+          }
+        };
+
+        return (
+          <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Task Schedule & Deliverable Calendar</h3>
+                <p className="text-xs text-slate-500">Interactive monthly grid with SLA deadlines and assigned tasks</p>
+              </div>
+
+              {/* Month Switcher Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+                  title="Previous Month"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="text-xs font-bold text-slate-800 w-36 text-center font-mono">
+                  {monthNames[calendarMonth]} {calendarYear}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+                  title="Next Month"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCalendarYear(2026);
+                    setCalendarMonth(8);
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer ml-1"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+
+            {/* 7-Column Month Grid */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200 text-center text-xs font-bold text-slate-600 py-2">
+                <div>Sun</div>
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+              </div>
+
+              <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-200 bg-slate-100">
+                {daysArray.map((dayNum, idx) => {
+                  if (dayNum === null) {
+                    return <div key={`empty-${idx}`} className="bg-slate-50/50 min-h-[90px]" />;
+                  }
+
+                  const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
+                  const isToday = dateStr === "2026-09-17";
+
+                  return (
+                    <div
+                      key={`day-${dayNum}`}
+                      className={`bg-white p-2 min-h-[95px] flex flex-col justify-between transition-colors hover:bg-blue-50/20 ${
+                        isToday ? "ring-2 ring-blue-500 ring-inset" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${
+                            isToday ? "bg-blue-600 text-white" : "text-slate-700"
+                          }`}
+                        >
+                          {dayNum}
+                        </span>
+                        {dayTasks.length > 0 && (
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {dayTasks.length} {dayTasks.length === 1 ? "task" : "tasks"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1 mt-1 flex-1 overflow-y-auto max-h-[70px]">
+                        {dayTasks.map((t) => {
+                          const isDone = t.status === "Done";
+                          return (
+                            <div
+                              key={t.id}
+                              onClick={() => setEditingTask(t)}
+                              className={`px-1.5 py-1 rounded text-[10px] border font-medium cursor-pointer truncate transition-all ${
+                                isDone
+                                  ? "bg-slate-100 text-slate-400 border-slate-200 line-through"
+                                  : t.priority === "Critical"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                  : t.priority === "High"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                  : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                              }`}
+                              title={`${t.title} (${t.projectName}) - Click to edit`}
+                            >
+                              {t.title}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Upcoming Deadline List */}
+            <div className="pt-2">
+              <h4 className="text-xs font-bold text-slate-900 mb-3">All Deadlines in Timeline</h4>
+              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                {filteredTasks
+                  .slice()
+                  .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))
+                  .map((t) => {
+                    const isDone = t.status === "Done";
+                    return (
+                      <div
+                        key={t.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
                           isDone
-                            ? "bg-emerald-600 border-emerald-600 text-white"
-                            : "border-slate-300 hover:border-blue-500 bg-white"
+                            ? "bg-slate-50/70 border-slate-200 text-slate-400"
+                            : "bg-white border-slate-200 hover:border-slate-300 text-slate-900"
                         }`}
                       >
-                        {isDone && <Check size={12} strokeWidth={3} />}
-                      </button>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className={`font-semibold ${isDone ? "line-through text-slate-400" : "text-slate-900"}`}>
-                            {t.title}
-                          </span>
-                          <PriorityBadge priority={t.priority} size="sm" />
-                          <StatusBadge status={t.status} size="sm" />
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleTaskCompletion(t.id)}
+                            className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+                              isDone
+                                ? "bg-emerald-600 border-emerald-600 text-white"
+                                : "border-slate-300 hover:border-blue-500 bg-white"
+                            }`}
+                          >
+                            {isDone && <Check size={12} strokeWidth={3} />}
+                          </button>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`font-semibold cursor-pointer hover:text-blue-600 ${
+                                  isDone ? "line-through text-slate-400" : "text-slate-900"
+                                }`}
+                                onClick={() => setEditingTask(t)}
+                              >
+                                {t.title}
+                              </span>
+                              <PriorityBadge priority={t.priority} size="sm" />
+                              <StatusBadge status={t.status} size="sm" />
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                              <span>{t.projectName}</span>
+                              <span>•</span>
+                              <span>Assignee: {t.assigneeName}</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span>{t.projectName}</span>
-                          <span>•</span>
-                          <span>Assignee: {t.assigneeName}</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200">
-                        <Calendar size={12} className="text-slate-400" />
-                        <input
-                          type="date"
-                          value={t.dueDate}
-                          onChange={(e) => setTaskDueDate(t.id, e.target.value)}
-                          className="text-xs font-mono text-slate-700 bg-transparent border-none cursor-pointer focus:outline-none"
-                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingTask(t)}
+                            className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                            title="Edit task"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-700">
+                            <Calendar size={11} className="text-slate-400" />
+                            <span>{t.dueDate}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+              </div>
+            </div>
           </div>
-        </div>
+        );
+      })()}
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          isOpen={true}
+          onClose={() => setEditingTask(null)}
+          onSave={(updated) => {
+            updateTask(editingTask.id, updated);
+            setEditingTask(null);
+          }}
+        />
       )}
     </div>
   );

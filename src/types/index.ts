@@ -303,11 +303,15 @@ export interface Asset {
   name: string;
   category: "Laptop" | "Desktop" | "Monitor" | "Mobile" | "Access Card";
   serialNumber: string;
+  assetCode?: string;
   employeeName?: string;
   employeeId?: string;
+  assignedToName?: string;
   condition: "New" | "Good" | "Fair" | "Repair";
   status: "Assigned" | "Available" | "Repair" | "Retired";
+  allocatedDate?: string;
 }
+
 
 export interface DocumentItem {
   id: string;
@@ -383,4 +387,25 @@ export interface SystemSettings {
     ai: boolean;
     automations: boolean;
   };
+}
+
+export interface Milestone {
+  id: string;
+  projectId: string;
+  projectName?: string;
+  name: string;
+  dueDate: string;
+  status: "Completed" | "In Progress" | "Pending Review" | "Planning";
+  weight?: string;
+  description?: string;
+}
+
+export interface UserInvitation {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  department: string;
+  status: "Pending" | "Accepted";
+  invitedAt: string;
 }

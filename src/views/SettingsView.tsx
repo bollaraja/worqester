@@ -11,8 +11,14 @@ import {
   Download,
   AlertTriangle,
   Building,
+  Users,
+  Plus,
+  Trash2,
+  Mail,
+  UserCheck,
 } from "lucide-react";
 import { Role } from "../types";
+import { InviteUserModal } from "../components/modals/EditModals";
 
 export const SettingsView: React.FC = () => {
   const {
@@ -23,8 +29,15 @@ export const SettingsView: React.FC = () => {
     auditLogs,
     resetToDemoData,
     currentUser,
+    availableUsers,
+    invitations,
+    inviteUser,
+    revokeInvitation,
+    rbacPermissions,
+    toggleRbacPermission,
   } = useApp();
 
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const activeSubView = currentSubView || "general";
 
   const [companyName, setCompanyName] = useState(settings.companyName);
@@ -77,6 +90,7 @@ export const SettingsView: React.FC = () => {
       <div className="flex items-center gap-2 overflow-x-auto scrollbar-none text-xs border-b border-slate-800 pb-4">
         {[
           { id: "general", label: "Organization Profile", icon: Building },
+          { id: "users", label: "Users & Invitations", icon: Users },
           { id: "modules", label: "Active Modules", icon: Layers },
           { id: "rbac", label: "RBAC Security Matrix", icon: Shield },
           { id: "audit", label: "Audit Trail Logs", icon: History },
@@ -187,6 +201,131 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
+      {/* VIEW: USERS & INVITATIONS */}
+      {activeSubView === "users" && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-white">Enterprise User Management</h3>
+              <p className="text-xs text-slate-400">
+                Manage active platform users, credentials, and pending team workspace invitations
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsInviteOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-blue-600/20"
+            >
+              <Plus size={14} />
+              <span>Invite Team Member</span>
+            </button>
+          </div>
+
+          {/* Active Users Table */}
+          <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <UserCheck size={14} className="text-emerald-400" />
+              <span>Active Workspace Members ({availableUsers.length})</span>
+            </h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 font-semibold">
+                    <th className="pb-3">User</th>
+                    <th className="pb-3">Role</th>
+                    <th className="pb-3">Department</th>
+                    <th className="pb-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {availableUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-800/30">
+                      <td className="py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-full bg-blue-600/20 text-blue-400 font-bold flex items-center justify-center text-xs">
+                            {u.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-white">{u.name}</div>
+                            <div className="text-[11px] text-slate-400">{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[11px] font-medium border border-slate-700">
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="py-3 text-slate-400">{u.department || "Enterprise Core"}</td>
+                      <td className="py-3">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                          Active
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pending Invitations */}
+          <div className="p-6 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-4">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <Mail size={14} className="text-amber-400" />
+              <span>Pending Invitations ({invitations.length})</span>
+            </h4>
+            {invitations.length === 0 ? (
+              <p className="text-xs text-slate-500 py-4 text-center">No pending invitations. Click "Invite Team Member" above to invite colleagues.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 font-semibold">
+                      <th className="pb-3">Email</th>
+                      <th className="pb-3">Assigned Role</th>
+                      <th className="pb-3">Invited By</th>
+                      <th className="pb-3">Sent Date</th>
+                      <th className="pb-3">Status</th>
+                      <th className="pb-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {invitations.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-800/30">
+                        <td className="py-3 font-semibold text-white">{inv.email}</td>
+                        <td className="py-3">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[11px] font-medium border border-blue-500/20">
+                            {inv.role}
+                          </span>
+                        </td>
+                        <td className="py-3 text-slate-400">{inv.invitedBy}</td>
+                        <td className="py-3 text-slate-400">{inv.sentDate}</td>
+                        <td className="py-3">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-semibold border border-amber-500/20">
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => revokeInvitation(inv.id)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            title="Revoke Invitation"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* VIEW: MODULE TOGGLES */}
       {activeSubView === "modules" && (
         <div className="max-w-2xl space-y-4">
@@ -255,27 +394,23 @@ export const SettingsView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {[
-                    { capability: "View Enterprise Dashboard & KPIs", roles: [true, true, true, true] },
-                    { capability: "Create & Edit CRM Deals / Accounts", roles: [true, true, true, false] },
-                    { capability: "Manage Employee Profiles & Salaries", roles: [true, false, false, false] },
-                    { capability: "Approve / Reject Leave Requests", roles: [true, true, true, false] },
-                    { capability: "Manage Project Budgets & Roadmaps", roles: [true, true, true, false] },
-                    { capability: "Execute AI Operations Audit", roles: [true, true, true, false] },
-                    { capability: "Mark Personal Daily Attendance", roles: [true, true, true, true] },
-                    { capability: "Access Organization System Settings", roles: [true, false, false, false] },
-                  ].map((row, idx) => (
+                  {Object.entries(rbacPermissions).map(([capability, roles], idx) => (
                     <tr key={idx} className="hover:bg-slate-800/30">
-                      <td className="py-3 font-medium text-white">{row.capability}</td>
-                      {row.roles.map((granted, rIdx) => (
+                      <td className="py-3 font-medium text-white">{capability}</td>
+                      {roles.map((granted, rIdx) => (
                         <td key={rIdx} className="py-3 text-center">
-                          {granted ? (
-                            <span className="inline-block w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 text-center leading-4 font-bold text-[10px]">
-                              ✓
-                            </span>
-                          ) : (
-                            <span className="text-slate-600 text-[10px]">—</span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => toggleRbacPermission(capability, rIdx)}
+                            title={`Toggle ${capability} permission`}
+                            className={`w-6 h-6 rounded-lg font-bold text-xs inline-flex items-center justify-center transition-all ${
+                              granted
+                                ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30"
+                                : "bg-slate-800/60 text-slate-500 hover:bg-slate-800 hover:text-slate-300 border border-slate-700/40"
+                            }`}
+                          >
+                            {granted ? "✓" : "—"}
+                          </button>
                         </td>
                       ))}
                     </tr>
@@ -377,6 +512,13 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Invite User Modal */}
+      <InviteUserModal
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        onInvite={inviteUser}
+      />
     </div>
   );
 };

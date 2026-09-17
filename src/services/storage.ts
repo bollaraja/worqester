@@ -20,6 +20,8 @@ import {
   initialActivities,
   initialAuditLogs,
   initialAutomations,
+  initialMilestones,
+  initialInvitations,
 } from "./seedData";
 import {
   Company,
@@ -43,6 +45,8 @@ import {
   AutomationRule,
   SystemSettings,
   User,
+  Milestone,
+  UserInvitation,
 } from "../types";
 
 const STORAGE_KEYS = {
@@ -69,6 +73,9 @@ const STORAGE_KEYS = {
   AUDIT_LOGS: "worqester_audit_logs_v1",
   AUTOMATIONS: "worqester_automations_v1",
   FAVORITES: "worqester_favorites_v1",
+  MILESTONES: "worqester_milestones_v1",
+  INVITATIONS: "worqester_invitations_v1",
+  RBAC_PERMISSIONS: "worqester_rbac_permissions_v1",
 };
 
 export class StorageService {
@@ -289,6 +296,39 @@ export class StorageService {
     this.save(STORAGE_KEYS.FAVORITES, favs);
   }
 
+  static getMilestones(): Milestone[] {
+    return this.load(STORAGE_KEYS.MILESTONES, initialMilestones);
+  }
+
+  static saveMilestones(items: Milestone[]): void {
+    this.save(STORAGE_KEYS.MILESTONES, items);
+  }
+
+  static getInvitations(): UserInvitation[] {
+    return this.load(STORAGE_KEYS.INVITATIONS, initialInvitations);
+  }
+
+  static saveInvitations(items: UserInvitation[]): void {
+    this.save(STORAGE_KEYS.INVITATIONS, items);
+  }
+
+  static getRbacPermissions(): Record<string, boolean[]> {
+    return this.load(STORAGE_KEYS.RBAC_PERMISSIONS, {
+      "View Enterprise Dashboard & KPIs": [true, true, true, true],
+      "Create & Edit CRM Deals / Accounts": [true, true, true, false],
+      "Manage Employee Profiles & Salaries": [true, false, false, false],
+      "Approve / Reject Leave Requests": [true, true, true, false],
+      "Manage Project Budgets & Roadmaps": [true, true, true, false],
+      "Execute AI Operations Audit": [true, true, true, false],
+      "Mark Personal Daily Attendance": [true, true, true, true],
+      "Access Organization System Settings": [true, false, false, false],
+    });
+  }
+
+  static saveRbacPermissions(matrix: Record<string, boolean[]>): void {
+    this.save(STORAGE_KEYS.RBAC_PERMISSIONS, matrix);
+  }
+
   // Reset demo data
   static resetToDemoData(): void {
     localStorage.removeItem(STORAGE_KEYS.USERS);
@@ -313,6 +353,9 @@ export class StorageService {
     localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
     localStorage.removeItem(STORAGE_KEYS.AUTOMATIONS);
     localStorage.removeItem(STORAGE_KEYS.FAVORITES);
+    localStorage.removeItem(STORAGE_KEYS.MILESTONES);
+    localStorage.removeItem(STORAGE_KEYS.INVITATIONS);
+    localStorage.removeItem(STORAGE_KEYS.RBAC_PERMISSIONS);
   }
 
   // Dynamic KPI Engine

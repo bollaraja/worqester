@@ -7,13 +7,18 @@ dotenv.config();
 
 async function main() {
   console.log("===============================================================");
-  console.log("             WORQESTER DATABASE BACKUP & EXPORT TOOL           ");
+  console.log("         WORQESTER PORTABLE TENANT DATA EXPORT TOOL            ");
+  console.log("===============================================================");
+  console.log("  Note: This tool provides portable, credential-sanitized JSON  ");
+  console.log("  tenant data exports. For full disaster recovery (indexes,     ");
+  console.log("  sequences, constraints, WAL), use Render Managed PostgreSQL   ");
+  console.log("  automated daily snapshots & point-in-time recovery (PITR).    ");
   console.log("===============================================================\n");
 
   const startTime = Date.now();
   const db = await getDatabase();
   const isPg = db.isPostgres();
-  console.log(`[Backup] Source Database: ${isPg ? "PostgreSQL (Production)" : "SQLite (Local/Dev)"}`);
+  console.log(`[Export] Source Database: ${isPg ? "PostgreSQL (Production)" : "SQLite (Local/Dev)"}`);
 
   const tables = [
     "workspaces",

@@ -153,63 +153,156 @@ function requirePermission(capability: string) {
 // ----------------------------------------------------
 app.post("/api/auth/signup", authRateLimiter, async (req, res) => {
   try {
-    const { name, email, password, role, department, workspace_id } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: "Name, email, and password are required." });
+    const { name, email, password, company_name, workspace_id } = req.body;
+    
+    // 1. Strict Input Validation
+    if (!name || typeof name !== "string" || name.trim().length < 2 || name.trim().length > 100) {
+      return res.status(400).json({ success: false, error: "Full name is required (between 2 and 100 characters)." });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, error: "Password must be at least 6 characters." });
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || typeof email !== "string" || !emailRegex.test(email.trim())) {
+      return res.status(400).json({ success: false, error: "A valid email address is required." });
+    }
+    if (!password || typeof password !== "string" || password.length < 8) {
+      return res.status(400).json({ success: false, error: "Password must be at least 8 characters long for security." });
     }
 
     const db = await getDatabase();
     const normalizedEmail = email.trim().toLowerCase();
-    const workspaceId = workspace_id || "org-worqester-01";
     const now = new Date().toISOString();
 
-    // Ensure workspace exists
-    const ws = await db.query("SELECT id FROM workspaces WHERE id = ?", [workspaceId]);
-    if (ws.length === 0) {
-      await db.execute(
-        "INSERT INTO workspaces (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
-        [workspaceId, "Worqester Workspace", "worqester", now]
-      );
+    // Check if the system has zero users (Initial bootstrap scenario)
+    const allUsers = await db.query("SELECT COUNT(*) as count FROM users");
+    const isFirstUserEver = Number(allUsers[0]?.count || 0) === 0;
+
+    let targetWorkspaceId = workspace_id ? String(workspace_id).trim() : (isFirstUserEver ? "org-worqester-01" : null);
+    let assignedRole: string = "Employee";
+    let assignedDepartment: string = "Operations";
+    let invitationIdToAccept: string | null = null;
+    let isNewWorkspace = false;
+    let newWorkspaceName = "";
+
+    // 2. Organization / Workspace & Invitation Scoping
+    if (company_name && typeof company_name === "string" && company_name.trim().length >= 2) {
+      // User is creating a brand new tenant organization
+      targetWorkspaceId = `ws-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
+      newWorkspaceName = company_name.trim();
+      isNewWorkspace = true;
+      assignedRole = "Super Admin"; // Tenant owner
+      assignedDepartment = "Executive";
+    } else if (targetWorkspaceId) {
+      // User is attempting to join an existing workspace
+      const wsRows = await db.query("SELECT id, name FROM workspaces WHERE id = ?", [targetWorkspaceId]);
+      if (wsRows.length === 0 && !isFirstUserEver) {
+        return res.status(404).json({ success: false, error: "The specified workspace does not exist." });
+      }
+
+      if (isFirstUserEver) {
+        assignedRole = "Super Admin";
+        assignedDepartment = "Executive";
+      } else {
+        // Enforce invitation-based joining to prevent unauthorized workspace access
+        const invRows = await db.query<{ id: string; role: string; department: string }>(
+          "SELECT id, role, department FROM invitations WHERE workspace_id = ? AND LOWER(email) = ? AND status = 'Pending'",
+          [targetWorkspaceId, normalizedEmail]
+        );
+
+        if (invRows.length === 0) {
+          return res.status(403).json({
+            success: false,
+            error: "Access denied. Joining an existing enterprise workspace requires an active invitation. Contact your administrator or register a new company workspace."
+          });
+        }
+
+        const inv = invRows[0];
+        invitationIdToAccept = inv.id;
+        // Strictly use the invited role - client-submitted role fields are completely ignored
+        assignedRole = inv.role || "Employee";
+        assignedDepartment = inv.department || "Operations";
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a Company/Organization Name to create a new workspace, or specify an invited Workspace ID."
+      });
     }
 
-    // Workspace-scoped email check
-    const existing = await db.query("SELECT id FROM users WHERE workspace_id = ? AND LOWER(email) = ?", [workspaceId, normalizedEmail]);
+    // 3. Duplicate email check in target workspace
+    const existing = await db.query("SELECT id FROM users WHERE workspace_id = ? AND LOWER(email) = ?", [targetWorkspaceId, normalizedEmail]);
     if (existing.length > 0) {
-      return res.status(409).json({ success: false, error: "An account with this email already exists in this workspace." });
+      return res.status(409).json({ success: false, error: "An account with this email already exists in this organization." });
     }
 
+    // 4. Atomic Database Transaction (Workspace creation + User + Session + Invitation update)
     const userId = `usr-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
     const salt = generateSalt();
     const passwordHash = hashPassword(password, salt);
     const avatar = `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`;
-
-    await db.execute(
-      `INSERT INTO users (id, workspace_id, name, email, avatar, role, department, job_title, salt, password_hash, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, workspaceId, name.trim(), normalizedEmail, avatar, role || "Employee", department || "Operations", role || "Employee", salt, passwordHash, now]
-    );
-
     const rawToken = generateToken();
     const tokenHash = hashSessionToken(rawToken);
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    await db.execute(
-      `INSERT INTO sessions (token_hash, user_id, workspace_id, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?)`,
-      [tokenHash, userId, workspaceId, now, expiresAt]
-    );
+
+    await db.transaction(async (tx) => {
+      // If brand new workspace, create it inside transaction
+      if (isNewWorkspace) {
+        const slug = newWorkspaceName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+        await tx.execute(
+          "INSERT INTO workspaces (id, name, slug, plan, created_at) VALUES (?, ?, ?, ?, ?)",
+          [targetWorkspaceId, newWorkspaceName, slug, "Enterprise Cloud", now]
+        );
+
+        // Seed default RBAC permissions matrix for new tenant
+        const defaultCaps = [
+          "View Enterprise Dashboard & KPIs",
+          "Create & Edit CRM Deals / Accounts",
+          "Manage Employee Profiles & Salaries",
+          "Approve / Reject Leave Requests",
+          "Manage Project Budgets & Roadmaps",
+          "Execute AI Operations Audit",
+          "Mark Personal Daily Attendance",
+          "Access Organization System Settings",
+        ];
+        for (const cap of defaultCaps) {
+          await tx.execute(
+            `INSERT INTO rbac_permissions (workspace_id, capability, super_admin, executive, project_manager, employee, updated_at)
+             VALUES (?, ?, 1, 1, 1, 0, ?)`,
+            [targetWorkspaceId, cap, now]
+          );
+        }
+      }
+
+      // Insert new user
+      await tx.execute(
+        `INSERT INTO users (id, workspace_id, name, email, avatar, role, department, job_title, salt, password_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, targetWorkspaceId, name.trim(), normalizedEmail, avatar, assignedRole, assignedDepartment, assignedRole, salt, passwordHash, now]
+      );
+
+      // Create session
+      await tx.execute(
+        `INSERT INTO sessions (token_hash, user_id, workspace_id, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [tokenHash, userId, targetWorkspaceId, now, expiresAt]
+      );
+
+      // If accepted invitation, update invitation status
+      if (invitationIdToAccept) {
+        await tx.execute(
+          "UPDATE invitations SET status = 'Accepted', updated_at = ? WHERE id = ? AND workspace_id = ?",
+          [now, invitationIdToAccept, targetWorkspaceId]
+        );
+      }
+    });
 
     const safeUser = {
       id: userId,
       name: name.trim(),
       email: normalizedEmail,
       avatar,
-      role: role || "Employee",
-      department: department || "Operations",
-      jobTitle: role || "Employee",
-      organizationId: workspaceId,
+      role: assignedRole,
+      department: assignedDepartment,
+      jobTitle: assignedRole,
+      organizationId: targetWorkspaceId,
       createdAt: now,
     };
 

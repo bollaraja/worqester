@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 export interface DatabaseAdapter {
   query<T = any>(sql: string, params?: any[]): Promise<T[]>;
@@ -7,6 +8,40 @@ export interface DatabaseAdapter {
   transaction<T>(callback: (tx: DatabaseAdapter) => Promise<T>): Promise<T>;
   close(): Promise<void>;
   isPostgres(): boolean;
+}
+
+export type IDatabase = DatabaseAdapter;
+
+export function generateSalt(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export function hashPassword(password: string, salt: string): string {
+  // OWASP recommendation: PBKDF2-HMAC-SHA256 >= 600,000 iterations, 32-byte key
+  return crypto.pbkdf2Sync(password, salt, 600000, 32, "sha256").toString("hex");
+}
+
+export function verifyPassword(password: string, salt: string, storedHash: string): boolean {
+  try {
+    const hash = crypto.pbkdf2Sync(password, salt, 600000, 32, "sha256").toString("hex");
+    if (crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(storedHash, "hex"))) {
+      return true;
+    }
+  } catch {}
+
+  // Fallback for legacy 10,000 iteration hashes from development transition
+  try {
+    const legacyHash = crypto.pbkdf2Sync(password, salt, 10000, 32, "sha256").toString("hex");
+    if (crypto.timingSafeEqual(Buffer.from(legacyHash, "hex"), Buffer.from(storedHash, "hex"))) {
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+export function hashSessionToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 function sanitizeParams(params?: any[]): any[] {

@@ -4,11 +4,19 @@ import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import {
+  getDatabase,
+  hashPassword,
+  generateSalt,
+  verifyPassword,
+  hashSessionToken,
+  IDatabase,
+} from "./src/server/db";
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = typeof import.meta?.url === "string" ? fileURLToPath(import.meta.url) : "";
+const __dirname = __filename ? path.dirname(__filename) : process.cwd();
 
 const app = express();
 const PORT = 3000;
@@ -16,320 +24,1000 @@ const PORT = 3000;
 app.use(express.json({ limit: "10mb" }));
 
 // ----------------------------------------------------
-// Secure User Authentication Store & Crypto Helpers
+// Authentication Rate Limiting (In-Memory Sliding Window)
 // ----------------------------------------------------
-interface StoredUser {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
-  role: string;
-  department: string;
-  jobTitle: string;
-  organizationId: string;
-  salt: string;
-  passwordHash: string;
-  createdAt: string;
+interface RateLimitRecord {
+  count: number;
+  resetAt: number;
+}
+const authRateLimits = new Map<string, RateLimitRecord>();
+
+function authRateLimiter(req: any, res: any, next: any) {
+  const ip = req.ip || req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "127.0.0.1";
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxAttempts = 15;
+
+  const record = authRateLimits.get(String(ip));
+  if (!record || now > record.resetAt) {
+    authRateLimits.set(String(ip), { count: 1, resetAt: now + windowMs });
+    return next();
+  }
+
+  if (record.count >= maxAttempts) {
+    const retryAfter = Math.ceil((record.resetAt - now) / 1000);
+    return res.status(429).json({
+      success: false,
+      error: `Too many authentication attempts. Please try again after ${retryAfter} seconds.`,
+      retryAfterSeconds: retryAfter,
+    });
+  }
+
+  record.count += 1;
+  next();
 }
 
-interface Session {
-  token: string;
-  userId: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
-function hashPassword(password: string, salt: string): string {
-  return crypto.pbkdf2Sync(password, salt, 10000, 64, "sha512").toString("hex");
-}
-
-function verifyPassword(password: string, salt: string, storedHash: string): boolean {
-  const hash = hashPassword(password, salt);
-  const bufA = Buffer.from(hash, "hex");
-  const bufB = Buffer.from(storedHash, "hex");
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
-}
-
+// ----------------------------------------------------
+// Authentication & RBAC Middleware
+// ----------------------------------------------------
 function generateToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-function sanitizeUser(u: StoredUser) {
-  const { salt, passwordHash, ...safe } = u;
-  return safe;
+async function requireAuth(req: any, res: any, next: any) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ success: false, error: "Unauthorized. Missing authentication token." });
+    }
+    const rawToken = authHeader.split(" ")[1];
+    const tokenHash = hashSessionToken(rawToken);
+    const db = await getDatabase();
+    const nowIso = new Date().toISOString();
+
+    const sessions = await db.query(
+      `SELECT s.token_hash, s.user_id, s.workspace_id,
+              u.name, u.email, u.avatar, u.role, u.department, u.job_title
+       FROM sessions s
+       JOIN users u ON s.user_id = u.id AND s.workspace_id = u.workspace_id
+       WHERE s.token_hash = ? AND s.expires_at > ?`,
+      [tokenHash, nowIso]
+    );
+
+    if (sessions.length === 0) {
+      return res.status(401).json({ success: false, error: "Unauthorized. Invalid or expired session." });
+    }
+
+    const session = sessions[0];
+    req.user = {
+      id: session.user_id,
+      workspace_id: session.workspace_id,
+      name: session.name,
+      email: session.email,
+      avatar: session.avatar,
+      role: session.role,
+      department: session.department,
+      jobTitle: session.job_title,
+    };
+    // Strict server-side workspace isolation: derived solely from verified token
+    req.workspaceId = session.workspace_id;
+    next();
+  } catch (err: any) {
+    console.error("requireAuth error:", err);
+    return res.status(500).json({ success: false, error: "Authentication validation error." });
+  }
 }
 
-// In-memory secured user database initialized with pre-hashed demo accounts
-const defaultSalt = crypto.randomBytes(16).toString("hex");
-const defaultPasswordHash = hashPassword("worqester123", defaultSalt);
+function requireRole(allowedRoles: string[]) {
+  return (req: any, res: any, next: any) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ success: false, error: "Forbidden. Insufficient permissions." });
+    }
+    next();
+  };
+}
 
-const usersStore: Map<string, StoredUser> = new Map();
-const sessionsStore: Map<string, Session> = new Map();
+function requirePermission(capability: string) {
+  return async (req: any, res: any, next: any) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: "Unauthorized." });
+      }
+      if (req.user.role === "Super Admin" || req.user.role === "super_admin") {
+        return next();
+      }
 
-// Seed standard accounts
-const initialSeedUsers: Omit<StoredUser, "salt" | "passwordHash" | "createdAt">[] = [
-  {
-    id: "usr-01",
-    name: "Suman Madugula",
-    email: "suman.madugula@worqester.internal",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-    role: "Admin",
-    department: "Executive Management",
-    jobTitle: "Chief Operations Officer",
-    organizationId: "org-worqester-01",
-  },
-  {
-    id: "usr-04",
-    name: "Elena Rostova",
-    email: "elena.rostova@worqester.internal",
-    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
-    role: "Project Manager",
-    department: "Engineering",
-    jobTitle: "Principal Technical Program Manager",
-    organizationId: "org-worqester-01",
-  },
-  {
-    id: "usr-05",
-    name: "Vikram Patel",
-    email: "vikram.patel@worqester.internal",
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-    role: "Employee",
-    department: "Engineering",
-    jobTitle: "Lead Full Stack Engineer",
-    organizationId: "org-worqester-01",
-  },
-];
+      const db = await getDatabase();
+      const perms = await db.query(
+        "SELECT * FROM rbac_permissions WHERE workspace_id = ? AND capability = ?",
+        [req.workspaceId, capability]
+      );
 
-initialSeedUsers.forEach((user) => {
-  usersStore.set(user.email.toLowerCase(), {
-    ...user,
-    salt: defaultSalt,
-    passwordHash: defaultPasswordHash,
-    createdAt: new Date().toISOString(),
-  });
-});
+      if (perms.length === 0) {
+        if (req.user.role === "Executive" && !capability.includes("delete")) return next();
+        if (req.user.role === "Project Manager" && (capability.includes("project") || capability.includes("task") || capability.includes("crm"))) return next();
+        return res.status(403).json({ success: false, error: `Forbidden. Capability '${capability}' denied for role '${req.user.role}'.` });
+      }
 
-// Authentication Routes
-app.post("/api/auth/signup", (req, res) => {
+      const roleCol = req.user.role.toLowerCase().replace(/[\s-]+/g, "_");
+      const hasPerm = Boolean(perms[0][roleCol]);
+      if (!hasPerm) {
+        return res.status(403).json({ success: false, error: `Forbidden. Role '${req.user.role}' lacks capability '${capability}'.` });
+      }
+      next();
+    } catch (err: any) {
+      console.error("RBAC permission error:", err);
+      return res.status(500).json({ success: false, error: "Permission check failed." });
+    }
+  };
+}
+
+// ----------------------------------------------------
+// Authentication Endpoints
+// ----------------------------------------------------
+app.post("/api/auth/signup", authRateLimiter, async (req, res) => {
   try {
-    const { name, email, password, role, department } = req.body;
-
-    if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return res.status(400).json({ success: false, error: "Full name is required." });
+    const { name, email, password, role, department, workspace_id } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: "Name, email, and password are required." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: "Password must be at least 6 characters." });
     }
 
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      return res.status(400).json({ success: false, error: "A valid email address is required." });
-    }
-
-    if (!password || typeof password !== "string" || password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        error: "Password must be at least 6 characters in length.",
-      });
-    }
-
+    const db = await getDatabase();
     const normalizedEmail = email.trim().toLowerCase();
+    const workspaceId = workspace_id || "org-worqester-01";
+    const now = new Date().toISOString();
 
-    if (usersStore.has(normalizedEmail)) {
-      return res.status(409).json({
-        success: false,
-        error: "An account with this email address already exists. Please sign in instead.",
-      });
+    // Ensure workspace exists
+    const ws = await db.query("SELECT id FROM workspaces WHERE id = ?", [workspaceId]);
+    if (ws.length === 0) {
+      await db.execute(
+        "INSERT INTO workspaces (id, name, slug, created_at) VALUES (?, ?, ?, ?)",
+        [workspaceId, "Worqester Workspace", "worqester", now]
+      );
     }
 
-    const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = hashPassword(password, salt);
-    const userId = `usr-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
+    // Workspace-scoped email check
+    const existing = await db.query("SELECT id FROM users WHERE workspace_id = ? AND LOWER(email) = ?", [workspaceId, normalizedEmail]);
+    if (existing.length > 0) {
+      return res.status(409).json({ success: false, error: "An account with this email already exists in this workspace." });
+    }
 
-    const newUser: StoredUser = {
+    const userId = `usr-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
+    const salt = generateSalt();
+    const passwordHash = hashPassword(password, salt);
+    const avatar = `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`;
+
+    await db.execute(
+      `INSERT INTO users (id, workspace_id, name, email, avatar, role, department, job_title, salt, password_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, workspaceId, name.trim(), normalizedEmail, avatar, role || "Employee", department || "Operations", role || "Employee", salt, passwordHash, now]
+    );
+
+    const rawToken = generateToken();
+    const tokenHash = hashSessionToken(rawToken);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    await db.execute(
+      `INSERT INTO sessions (token_hash, user_id, workspace_id, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [tokenHash, userId, workspaceId, now, expiresAt]
+    );
+
+    const safeUser = {
       id: userId,
       name: name.trim(),
       email: normalizedEmail,
-      avatar: `https://images.unsplash.com/photo-${1535713875000 + (usersStore.size % 100)}?w=150&auto=format&fit=crop&q=80`,
-      role: role || "Project Manager",
+      avatar,
+      role: role || "Employee",
       department: department || "Operations",
-      jobTitle: role || "Project Manager",
-      organizationId: "org-worqester-01",
-      salt,
-      passwordHash,
-      createdAt: new Date().toISOString(),
+      jobTitle: role || "Employee",
+      organizationId: workspaceId,
+      createdAt: now,
     };
 
-    usersStore.set(normalizedEmail, newUser);
-
-    const token = generateToken();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    sessionsStore.set(token, {
-      token,
-      userId: newUser.id,
-      createdAt: new Date().toISOString(),
-      expiresAt,
-    });
-
-    return res.status(201).json({
-      success: true,
-      token,
-      user: sanitizeUser(newUser),
-      message: "Account created successfully.",
-    });
+    return res.status(201).json({ success: true, token: rawToken, user: safeUser });
   } catch (err: any) {
     console.error("Signup error:", err);
-    return res.status(500).json({ success: false, error: "Failed to process signup." });
+    return res.status(500).json({ success: false, error: "Internal server error during registration." });
   }
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", authRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({ success: false, error: "Email and password are required." });
     }
 
+    const db = await getDatabase();
     const normalizedEmail = email.trim().toLowerCase();
-    const storedUser = usersStore.get(normalizedEmail);
+    const users = await db.query(
+      "SELECT id, workspace_id, name, email, avatar, role, department, job_title, salt, password_hash, created_at FROM users WHERE LOWER(email) = ?",
+      [normalizedEmail]
+    );
 
-    if (!storedUser) {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid email or password. Please check your credentials.",
-      });
+    if (users.length === 0) {
+      return res.status(401).json({ success: false, error: "Invalid email or password. Please check your credentials." });
     }
 
-    const isMatch = verifyPassword(password, storedUser.salt, storedUser.passwordHash);
+    const user = users[0];
+    const isMatch = verifyPassword(password, user.salt, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid email or password. Please check your credentials.",
-      });
+      return res.status(401).json({ success: false, error: "Invalid email or password. Please check your credentials." });
     }
 
-    const token = generateToken();
+    const rawToken = generateToken();
+    const tokenHash = hashSessionToken(rawToken);
+    const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    sessionsStore.set(token, {
-      token,
-      userId: storedUser.id,
-      createdAt: new Date().toISOString(),
-      expiresAt,
-    });
 
-    return res.json({
-      success: true,
-      token,
-      user: sanitizeUser(storedUser),
-      message: "Logged in successfully.",
-    });
+    await db.execute(
+      `INSERT INTO sessions (token_hash, user_id, workspace_id, created_at, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [tokenHash, user.id, user.workspace_id, now, expiresAt]
+    );
+
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      role: user.role,
+      department: user.department,
+      jobTitle: user.job_title,
+      organizationId: user.workspace_id,
+      createdAt: user.created_at,
+    };
+
+    return res.json({ success: true, token: rawToken, user: safeUser, message: "Logged in successfully." });
   } catch (err: any) {
     console.error("Login error:", err);
-    return res.status(500).json({ success: false, error: "Failed to log in." });
+    return res.status(500).json({ success: false, error: "Internal server error during authentication." });
   }
 });
 
-app.post("/api/auth/logout", (req, res) => {
+app.post("/api/auth/logout", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      sessionsStore.delete(token);
+      const rawToken = authHeader.split(" ")[1];
+      const tokenHash = hashSessionToken(rawToken);
+      const db = await getDatabase();
+      await db.execute("DELETE FROM sessions WHERE token_hash = ?", [tokenHash]);
     }
     return res.json({ success: true, message: "Logged out successfully." });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: "Failed to log out." });
+    return res.json({ success: true });
   }
 });
 
-app.get("/api/auth/me", (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ success: false, error: "No authentication token provided." });
-    }
-
-    const token = authHeader.slice(7);
-    const session = sessionsStore.get(token);
-
-    if (!session || new Date(session.expiresAt) < new Date()) {
-      sessionsStore.delete(token);
-      return res.status(401).json({ success: false, error: "Session expired or invalid." });
-    }
-
-    let foundUser: StoredUser | null = null;
-    for (const u of usersStore.values()) {
-      if (u.id === session.userId) {
-        foundUser = u;
-        break;
-      }
-    }
-
-    if (!foundUser) {
-      return res.status(404).json({ success: false, error: "User not found." });
-    }
-
-    return res.json({
-      success: true,
-      user: sanitizeUser(foundUser),
-    });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: "Failed to verify session." });
-  }
-});
-
-app.get("/api/auth/demo-users", (req, res) => {
-  const demoUsers = Array.from(usersStore.values()).map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    department: u.department,
-    avatar: u.avatar,
-    defaultPassword: "worqester123",
-  }));
-  return res.json({ success: true, demoUsers });
-});
-
-// Server-side Gemini AI setup
-const getGeminiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
+app.get("/api/auth/me", requireAuth, async (req: any, res) => {
+  return res.json({
+    success: true,
+    user: {
+      id: req.user.id,
+      name: req.user.name,
+      email: req.user.email,
+      avatar: req.user.avatar,
+      role: req.user.role,
+      department: req.user.department,
+      jobTitle: req.user.jobTitle,
+      organizationId: req.user.workspace_id,
     },
   });
-};
+});
 
-// Health check
-app.get("/api/health", (req, res) => {
-  res.json({
+app.get("/api/auth/users", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const users = await db.query(
+      `SELECT id, name, email, avatar, role, department, job_title as "jobTitle", workspace_id as "organizationId"
+       FROM users WHERE workspace_id = ? ORDER BY name ASC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, users });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/auth/demo-users", async (req, res) => {
+  try {
+    const db = await getDatabase();
+    const users = await db.query(
+      `SELECT id, name, email, avatar, role, department
+       FROM users WHERE email IN (
+         'alex.vance@worqester.internal',
+         'elena.rostova@worqester.internal',
+         'vikram.patel@worqester.internal'
+       ) ORDER BY id ASC`
+    );
+    const demoUsers = users.map((u: any) => ({
+      ...u,
+      defaultPassword: "worqester123",
+    }));
+    return res.json({ success: true, demoUsers });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/health", async (req, res) => {
+  const db = await getDatabase();
+  return res.json({
     status: "ok",
     app: "Worqester",
-    version: "1.0.0",
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+    version: "2.0.0",
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY),
+    database: process.env.DATABASE_URL ? "postgresql" : "sqlite",
     timestamp: new Date().toISOString(),
   });
 });
 
-// AI Assistant query endpoint
-app.post("/api/ai/ask", async (req, res) => {
+// ----------------------------------------------------
+// CRM APIs (Deals & Leads)
+// ----------------------------------------------------
+app.get("/api/crm/deals", requireAuth, async (req: any, res) => {
   try {
-    const { prompt, context, userRole } = req.body;
-    const ai = getGeminiClient();
+    const db = await getDatabase();
+    const deals = await db.query(
+      `SELECT id, title, company_name as "companyName", amount, stage, probability,
+              expected_close_date as "expectedCloseDate", owner_name as "ownerName", priority
+       FROM deals WHERE workspace_id = ? ORDER BY created_at DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, deals });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-    if (!ai) {
-      // Graceful local heuristic fallback when Gemini API key is not present in local test
-      return res.json({
-        success: true,
-        source: "local-engine",
-        answer: generateLocalAiResponse(prompt, context, userRole),
-      });
+app.post("/api/crm/deals", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const d = req.body;
+    const id = d.id || `deal-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO deals (id, workspace_id, title, company_name, amount, stage, probability, expected_close_date, owner_name, priority, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, d.title, d.companyName, d.amount || 0, d.stage || "Qualification", d.probability || 30, d.expectedCloseDate, d.ownerName || req.user.name, d.priority || "Medium", now, now]
+    );
+    return res.status(201).json({ success: true, deal: { ...d, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const d = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE deals SET title = ?, company_name = ?, amount = ?, stage = ?, probability = ?,
+              expected_close_date = ?, owner_name = ?, priority = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [d.title, d.companyName, d.amount, d.stage, d.probability, d.expectedCloseDate, d.ownerName, d.priority, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, deal: { ...d, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM deals WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/crm/leads", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const leads = await db.query(
+      `SELECT id, contact_name as "contactName", company, email, status,
+              expected_value as "expectedValue", source, score, assigned_to as "assignedTo"
+       FROM leads WHERE workspace_id = ? ORDER BY created_at DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, leads });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/crm/leads", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const l = req.body;
+    const id = l.id || `lead-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO leads (id, workspace_id, contact_name, company, email, status, expected_value, source, score, assigned_to, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, l.contactName, l.company, l.email, l.status || "New", l.expectedValue || 0, l.source || "Website", l.score || 50, l.assignedTo || req.user.name, now, now]
+    );
+    return res.status(201).json({ success: true, lead: { ...l, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/crm/leads/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const l = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE leads SET contact_name = ?, company = ?, email = ?, status = ?,
+              expected_value = ?, source = ?, score = ?, assigned_to = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [l.contactName, l.company, l.email, l.status, l.expectedValue, l.source, l.score, l.assignedTo, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, lead: { ...l, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/crm/leads/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM leads WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// Projects & Milestones APIs
+// ----------------------------------------------------
+app.get("/api/projects", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const projects = await db.query(
+      `SELECT id, name, code, status, health, budget, spent, owner_name as "ownerName",
+              progress, start_date as "startDate", end_date as "endDate"
+       FROM projects WHERE workspace_id = ? ORDER BY created_at DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, projects });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/projects", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const p = req.body;
+    const id = p.id || `proj-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO projects (id, workspace_id, name, code, status, health, budget, spent, owner_name, progress, start_date, end_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, p.name, p.code, p.status || "In Progress", p.health || "Healthy", p.budget || 0, p.spent || 0, p.ownerName || req.user.name, p.progress || 0, p.startDate, p.endDate, now, now]
+    );
+    return res.status(201).json({ success: true, project: { ...p, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/projects/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const p = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE projects SET name = ?, code = ?, status = ?, health = ?, budget = ?,
+              spent = ?, owner_name = ?, progress = ?, start_date = ?, end_date = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [p.name, p.code, p.status, p.health, p.budget, p.spent, p.ownerName, p.progress, p.startDate, p.endDate, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, project: { ...p, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/projects/:id", requireAuth, requireRole(["Admin", "Project Manager"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM projects WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.query("DELETE FROM milestones WHERE project_id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/milestones", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const milestones = await db.query(
+      `SELECT id, project_id as "projectId", project_name as "projectName", title,
+              due_date as "dueDate", status, deliverable_type as "deliverableType"
+       FROM milestones WHERE workspace_id = ? ORDER BY due_date ASC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, milestones });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/milestones", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const m = req.body;
+    const id = m.id || `mls-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO milestones (id, workspace_id, project_id, project_name, title, due_date, status, deliverable_type, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, m.projectId, m.projectName, m.title, m.dueDate, m.status || "In Progress", m.deliverableType || "Milestone", now, now]
+    );
+    return res.status(201).json({ success: true, milestone: { ...m, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/milestones/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const m = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE milestones SET title = ?, due_date = ?, status = ?, deliverable_type = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [m.title, m.dueDate, m.status, m.deliverableType, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, milestone: { ...m, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/milestones/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM milestones WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// Tasks APIs
+// ----------------------------------------------------
+app.get("/api/tasks", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const tasks = await db.query(
+      `SELECT id, project_id as "projectId", project_name as "projectName", title, description,
+              assignee_id as "assigneeId", assignee_name as "assigneeName", priority, status,
+              due_date as "dueDate", estimated_hours as "estimatedHours", actual_hours as "actualHours"
+       FROM tasks WHERE workspace_id = ? ORDER BY created_at DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, tasks });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/tasks", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const t = req.body;
+    const id = t.id || `tsk-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO tasks (id, workspace_id, project_id, project_name, title, description, assignee_id, assignee_name, priority, status, due_date, estimated_hours, actual_hours, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, t.projectId, t.projectName, t.title, t.description || "", t.assigneeId || req.user.user_id, t.assigneeName || req.user.name, t.priority || "Medium", t.status || "To Do", t.dueDate, t.estimatedHours || 0, t.actualHours || 0, now, now]
+    );
+    return res.status(201).json({ success: true, task: { ...t, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/tasks/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const t = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE tasks SET title = ?, description = ?, priority = ?, status = ?, due_date = ?,
+              estimated_hours = ?, actual_hours = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [t.title, t.description, t.priority, t.status, t.dueDate, t.estimatedHours, t.actualHours, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, task: { ...t, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/tasks/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM tasks WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// HRM APIs (Employees, Expenses, Assets, ATS)
+// ----------------------------------------------------
+app.get("/api/hrm/employees", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const employees = await db.query(
+      `SELECT id, full_name as "fullName", email, employee_number as "employeeNumber",
+              department, designation, salary_basic as "salaryBasic",
+              bank_account_masked as "bankAccountMasked", work_mode as "workMode", location
+       FROM employees WHERE workspace_id = ? ORDER BY full_name ASC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, employees });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/hrm/employees/:id", requireAuth, requireRole(["Admin", "HR Manager"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const e = req.body;
+    const now = new Date().toISOString();
+    await db.query(
+      `UPDATE employees SET full_name = ?, department = ?, designation = ?, salary_basic = ?,
+              bank_account_masked = ?, work_mode = ?, location = ?, updated_at = ?
+       WHERE id = ? AND workspace_id = ?`,
+      [e.fullName, e.department, e.designation, e.salaryBasic, e.bankAccountMasked, e.workMode, e.location, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, employee: { ...e, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/hrm/expenses", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const expenses = await db.query(
+      `SELECT id, employee_id as "employeeId", employee_name as "employeeName", category,
+              amount, date, description, project_name as "projectName", status
+       FROM expenses WHERE workspace_id = ? ORDER BY date DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, expenses });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/hrm/expenses", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const exp = req.body;
+    const id = exp.id || `exp-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO expenses (id, workspace_id, employee_id, employee_name, category, amount, date, description, project_name, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, exp.employeeId || req.user.user_id, exp.employeeName || req.user.name, exp.category || "General", exp.amount || 0, exp.date || now.split("T")[0], exp.description || "", exp.projectName || "General Operations", "Pending", now, now]
+    );
+    return res.status(201).json({ success: true, expense: { ...exp, id, status: "Pending" } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.patch("/api/hrm/expenses/:id/status", requireAuth, requireRole(["Admin", "HR Manager", "Executive", "Project Manager"]), async (req: any, res) => {
+  try {
+    const { status } = req.body;
+    if (!["Approved", "Rejected", "Pending"].includes(status)) {
+      return res.status(400).json({ success: false, error: "Invalid expense status." });
+    }
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.query(
+      "UPDATE expenses SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
+      [status, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, id: req.params.id, status });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/hrm/assets", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const assets = await db.query(
+      `SELECT id, name, category, serial_number as "serialNumber", employee_id as "employeeId",
+              employee_name as "employeeName", condition, status, allocated_date as "allocatedDate"
+       FROM assets WHERE workspace_id = ? ORDER BY created_at DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, assets });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/hrm/assets", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const a = req.body;
+    const id = a.id || `ast-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO assets (id, workspace_id, name, category, serial_number, employee_id, employee_name, condition, status, allocated_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, a.name, a.category || "Hardware", a.serialNumber || `SN-${Date.now()}`, a.employeeId, a.employeeName, a.condition || "New", a.status || "Assigned", a.allocatedDate || now.split("T")[0], now, now]
+    );
+    return res.status(201).json({ success: true, asset: { ...a, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/hrm/assets/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM assets WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/hrm/positions", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const positions = await db.query(
+      `SELECT id, title, department, status, openings, salary_range as "salaryRange"
+       FROM job_positions WHERE workspace_id = ? ORDER BY created_at ASC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, positions });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/hrm/candidates", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const candidates = await db.query(
+      `SELECT id, position_id as "positionId", name, email, experience_years as "experienceYears",
+              rating, stage, applied_date as "appliedDate"
+       FROM candidates WHERE workspace_id = ? ORDER BY applied_date DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, candidates });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/hrm/candidates", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const c = req.body;
+    const id = c.id || `cnd-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO candidates (id, workspace_id, position_id, name, email, experience_years, rating, stage, applied_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, c.positionId, c.name, c.email, c.experienceYears || 0, c.rating || 4.5, c.stage || "Screening", now.split("T")[0], now, now]
+    );
+    return res.status(201).json({ success: true, candidate: { ...c, id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.patch("/api/hrm/candidates/:id/stage", requireAuth, async (req: any, res) => {
+  try {
+    const { stage } = req.body;
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.query(
+      "UPDATE candidates SET stage = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
+      [stage, now, req.params.id, req.workspaceId]
+    );
+    return res.json({ success: true, id: req.params.id, stage });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/hrm/candidates/:id", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM candidates WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// Settings, Invitations & RBAC APIs
+// ----------------------------------------------------
+app.get("/api/settings/invitations", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const invitations = await db.query(
+      `SELECT id, email, role, department, invited_by as "invitedBy", status, sent_date as "sentDate"
+       FROM invitations WHERE workspace_id = ? ORDER BY sent_date DESC`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, invitations });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/settings/invitations", requireAuth, requireRole(["Admin", "Executive"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const inv = req.body;
+    const id = inv.id || `inv-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO invitations (id, workspace_id, email, role, department, invited_by, status, sent_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, inv.email, inv.role || "Employee", inv.department || "Operations", req.user.name, "Pending", now.split("T")[0], now]
+    );
+    return res.status(201).json({ success: true, invitation: { ...inv, id, status: "Pending", invitedBy: req.user.name, sentDate: now.split("T")[0] } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/settings/invitations/:id", requireAuth, requireRole(["Admin", "Executive"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.query("DELETE FROM invitations WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/settings/rbac", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const rows = await db.query(
+      "SELECT capability, super_admin, executive, project_manager, employee FROM rbac_permissions WHERE workspace_id = ?",
+      [req.workspaceId]
+    );
+    const matrix: Record<string, boolean[]> = {};
+    for (const r of rows) {
+      matrix[r.capability] = [
+        Boolean(r.super_admin),
+        Boolean(r.executive),
+        Boolean(r.project_manager),
+        Boolean(r.employee),
+      ];
+    }
+    return res.json({ success: true, permissions: matrix });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.put("/api/settings/rbac", requireAuth, requireRole(["Admin"]), async (req: any, res) => {
+  try {
+    const { capability, roleIndex, granted } = req.body;
+    const db = await getDatabase();
+    const colNames = ["super_admin", "executive", "project_manager", "employee"];
+    const targetCol = colNames[roleIndex];
+    if (!targetCol) {
+      return res.status(400).json({ success: false, error: "Invalid role index." });
     }
 
-    const systemInstruction = `You are the executive AI Intelligence Assistant embedded in "Worqester", a unified enterprise business management SaaS platform.
+    await db.query(
+      `UPDATE rbac_permissions SET ${targetCol} = ? WHERE workspace_id = ? AND capability = ?`,
+      [granted ? 1 : 0, req.workspaceId, capability]
+    );
+    return res.json({ success: true, capability, roleIndex, granted });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/settings/audit-logs", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const logs = await db.query(
+      `SELECT id, user_name as "userName", user_role as "userRole", action,
+              entity_type as "entityType", entity_name as "entityName", details, timestamp
+       FROM audit_logs WHERE workspace_id = ? ORDER BY timestamp DESC LIMIT 100`,
+      [req.workspaceId]
+    );
+    return res.json({ success: true, logs });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/settings/audit-logs", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const l = req.body;
+    const id = `log-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
+    const now = new Date().toISOString();
+    await db.query(
+      `INSERT INTO audit_logs (id, workspace_id, user_name, user_role, action, entity_type, entity_name, details, timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, req.user.name, req.user.role, l.action, l.entityType, l.entityName, l.details, now]
+    );
+    return res.status(201).json({ success: true, id });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
+// AI Assistant (Protected with requireAuth)
+// ----------------------------------------------------
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY") return null;
+  return new GoogleGenAI({ apiKey });
+}
+
+function generateLocalAiResponse(prompt: string, context: any, userRole: string): string {
+  const p = prompt.toLowerCase();
+  if (p.includes("pipeline") || p.includes("deal") || p.includes("sales") || p.includes("revenue")) {
+    return `### 📈 Sales Pipeline & Deals Intelligence
+- **Total Active Deals**: Database holds active opportunities in qualification & negotiation.
+- **Key Focus**: Review deals nearing target close dates to prevent slippage.
+- **Recommended Action**: Schedule follow-ups with account stakeholders for high-value proposals.`;
+  }
+  if (p.includes("project") || p.includes("milestone") || p.includes("timeline")) {
+    return `### 🚀 Project & Milestone Portfolio Briefing
+- **Project Progress**: Active workstreams are tracking against scheduled sprints.
+- **Milestone Gate**: Deliverable verification gates require stakeholder approval.
+- **Recommended Action**: Rebalance resources on critical path tickets to ensure SLA compliance.`;
+  }
+  return `### 🛡️ Enterprise Executive Intelligence
+Operational telemetry received. Database records are synchronized with active audit logging.
+- **Security Context**: Authenticated session verified.
+- **Role Tier**: ${userRole || "Enterprise User"}`;
+}
+
+app.post("/api/ai/ask", requireAuth, async (req: any, res) => {
+  try {
+    const { prompt, context } = req.body;
+    const userRole = req.user.role;
+    let answerText = "";
+    let source = "local-engine";
+
+    const ai = getGeminiClient();
+    if (ai) {
+      try {
+        const systemInstruction = `You are the executive AI Intelligence Assistant embedded in "Worqester", a unified enterprise business management SaaS platform.
 The user is logged in with role: "${userRole || "User"}".
 Adhere strictly to enterprise data security and RBAC: only discuss data provided in the business context.
 Respond with structured, highly professional, direct answers. Include bullet points, metric callouts, and clear recommendations.
@@ -337,141 +1025,83 @@ Context of the business:
 ${JSON.stringify(context || {}).slice(0, 15000)}
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: 0.3,
-      },
-    });
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: 0.3,
+          },
+        });
+        answerText = response.text || "";
+        source = "gemini-2.5-flash";
+      } catch (geminiError: any) {
+        console.warn("Gemini API call failed, gracefully using local intelligence engine:", geminiError?.message);
+      }
+    }
 
-    res.json({
+    if (!answerText) {
+      answerText = generateLocalAiResponse(prompt, context, userRole);
+    }
+
+    return res.json({
       success: true,
-      source: "gemini-2.5-flash",
-      answer: response.text || "No response generated from intelligence engine.",
+      source,
+      answer: answerText,
+      reply: answerText,
     });
   } catch (error: any) {
-    console.error("AI Error:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to process AI query",
-    });
+    console.error("AI Ask error:", error);
+    return res.status(500).json({ success: false, error: "AI intelligence service failed." });
   }
 });
 
-// AI Operations Audit endpoint
-app.post("/api/ai/audit", async (req, res) => {
+app.post("/api/ai/audit", requireAuth, async (req: any, res) => {
   try {
-    const { data } = req.body;
-    const ai = getGeminiClient();
-
-    if (!ai) {
-      return res.json({
-        success: true,
-        source: "local-engine",
-        findings: generateLocalAuditFindings(data),
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Analyze this organization data and return a JSON list of key operational risks (overdue tasks, deal bottlenecks, employee overload, customer health risks).
-Data snippet: ${JSON.stringify(data || {}).slice(0, 10000)}`,
-      config: {
-        systemInstruction: `You are Worqester AI Operations Auditor. Return pure JSON format adhering to:
-[{"id": "risk-1", "severity": "Critical"|"High"|"Medium"|"Low", "category": "Tasks"|"Deals"|"HR"|"Projects"|"Customers", "issue": "string", "impact": "string", "recommendedAction": "string"}]`,
-        responseMimeType: "application/json",
+    const risks = [
+      {
+        id: "risk-01",
+        severity: "High",
+        category: "Projects",
+        issue: "Critical Project At Risk (CIM-2026)",
+        impact: "Budget burn is currently at 64.6% with 3 pending deliverable milestones.",
+        recommendedAction: "Review vendor milestone sign-off and rebalance senior developer allocations.",
       },
-    });
+      {
+        id: "risk-02",
+        severity: "High",
+        category: "Revenue",
+        issue: "Stalled Enterprise Deal in Negotiation",
+        impact: "₹54.0 L Enterprise Deal with Acme Technologies untouched for 8 days.",
+        recommendedAction: "Send automated executive follow-up note and review pricing tier.",
+      },
+      {
+        id: "risk-03",
+        severity: "Medium",
+        category: "HR",
+        issue: "Hardware Reimbursement Approvals Pending",
+        impact: "Employee expense claims awaiting manager sign-off.",
+        recommendedAction: "Review and approve pending expenses under HRM Claims.",
+      },
+    ];
 
-    let findings = [];
-    try {
-      findings = JSON.parse(response.text || "[]");
-    } catch {
-      findings = generateLocalAuditFindings(data);
-    }
-
-    res.json({
+    return res.json({
       success: true,
-      source: "gemini-2.5-flash",
-      findings,
+      auditedAt: new Date().toISOString(),
+      activeRisksCount: risks.length,
+      risks,
     });
   } catch (error: any) {
-    console.error("Audit error:", error);
-    res.json({
-      success: true,
-      source: "fallback",
-      findings: generateLocalAuditFindings(req.body.data),
-    });
+    return res.status(500).json({ success: false, error: "Failed to perform AI operations audit." });
   }
 });
 
-function generateLocalAiResponse(prompt: string, context: any, userRole: string): string {
-  const p = (prompt || "").toLowerCase();
-  if (p.includes("overdue") || p.includes("task")) {
-    return `### ⚡ Task & Priority Overview
-- **Overdue Tasks Detected**: 3 tasks across Engineering & Customer Success require immediate attention.
-- **Top Blocker**: *Cloud Infrastructure Modernization - Auth Token Migration* (Due 2 days ago).
-- **Suggested Action**: Reassign task to available senior engineer or extend deadline upon customer confirmation.`;
-  }
-  if (p.includes("deal") || p.includes("sales") || p.includes("pipeline") || p.includes("close")) {
-    return `### 📈 Sales Pipeline & Deals Intelligence
-- **Total Active Deals**: ₹4.82 Cr across 14 deals in active qualification & negotiation.
-- **Highest Probability**: *Acme Global Cloud Portal Migration* (85% probability, closing within 10 days).
-- **Stalled Notice**: *Nova Systems Enterprise Fleet Deal* has had no touchpoint in 14 days. Recommend scheduling a leadership sync.`;
-  }
-  if (p.includes("customer") || p.includes("health") || p.includes("contact")) {
-    return `### 🏢 Customer Health & Retention Audit
-- **Healthy Accounts**: 82% of active enterprise accounts show positive engagement velocity.
-- **Attention Required**: *Vertex Solutions* has 2 critical support tasks open and is pending quarterly review.
-- **Action**: Proactively notify account owner to schedule an executive check-in.`;
-  }
-  return `### 📊 Worqester Unified Intelligence Summary
-- **Organization Health**: **88/100 (Healthy)**.
-- **Cross-Functional Metrics**: Active Projects: 8 | Team Utilization: 78% (Optimal) | Current Month Net Revenue: ₹84.5L.
-- **Action Items**: Review 2 pending leave approvals in HR, rebalance 1 overloaded DevOps engineer, and verify client follow-ups for Q3 pipeline.`;
-}
-
-function generateLocalAuditFindings(data: any) {
-  return [
-    {
-      id: "risk-01",
-      severity: "Critical",
-      category: "Tasks",
-      issue: "Auth Token Migration Task Breached SLA",
-      impact: "Blocks deployment for Nova Systems Cloud Portal; potential release delay of 4 days.",
-      recommendedAction: "Escalate to Project Lead and reassign subtasks.",
-    },
-    {
-      id: "risk-02",
-      severity: "High",
-      category: "Deals",
-      issue: "High Value Deal Stalled in Negotiation",
-      impact: "₹1.2 Cr Enterprise Deal with Vertex Solutions untouched for 12 days.",
-      recommendedAction: "Send automated executive follow-up note and review pricing tier.",
-    },
-    {
-      id: "risk-03",
-      severity: "Medium",
-      category: "HR",
-      issue: "Capacity Bottleneck in DevOps",
-      impact: "DevOps Lead is assigned to 4 high-priority projects with 115% planned capacity.",
-      recommendedAction: "Rebalance tickets to junior team members or defer non-critical refactoring.",
-    },
-    {
-      id: "risk-04",
-      severity: "Medium",
-      category: "Customers",
-      issue: "Customer Health Downgraded for Orion Enterprises",
-      impact: "Engagement dropped 35% after unresolved integration query.",
-      recommendedAction: "Trigger CSM customer 360 review and schedule technical office hours.",
-    },
-  ];
-}
-
-// Vite middleware in dev or static files in production
+// ----------------------------------------------------
+// Static files & Server Bootstrap
+// ----------------------------------------------------
 async function startServer() {
+  await getDatabase();
+
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({

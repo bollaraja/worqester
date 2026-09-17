@@ -437,9 +437,8 @@ app.get("/api/health", async (req, res) => {
   const db = await getDatabase();
   return res.json({
     status: "ok",
-    app: "Worqester",
-    version: "2.0.0",
-    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY),
+    app: "Worqester Unified Enterprise Platform",
+    version: "2.0.0-relational",
     database: process.env.DATABASE_URL ? "postgresql" : "sqlite",
     timestamp: new Date().toISOString(),
   });
@@ -1148,42 +1147,33 @@ app.post("/api/settings/audit-logs", requireAuth, async (req: any, res) => {
 // AI Assistant (Protected with requireAuth)
 // ----------------------------------------------------
 function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY") return null;
-  return new GoogleGenAI({ apiKey });
-}
-
-function generateLocalAiResponse(prompt: string, context: any, userRole: string): string {
-  const p = prompt.toLowerCase();
-  if (p.includes("pipeline") || p.includes("deal") || p.includes("sales") || p.includes("revenue")) {
-    return `### 📈 Sales Pipeline & Deals Intelligence
-- **Total Active Deals**: Database holds active opportunities in qualification & negotiation.
-- **Key Focus**: Review deals nearing target close dates to prevent slippage.
-- **Recommended Action**: Schedule follow-ups with account stakeholders for high-value proposals.`;
-  }
-  if (p.includes("project") || p.includes("milestone") || p.includes("timeline")) {
-    return `### 🚀 Project & Milestone Portfolio Briefing
-- **Project Progress**: Active workstreams are tracking against scheduled sprints.
-- **Milestone Gate**: Deliverable verification gates require stakeholder approval.
-- **Recommended Action**: Rebalance resources on critical path tickets to ensure SLA compliance.`;
-  }
-  return `### 🛡️ Enterprise Executive Intelligence
-Operational telemetry received. Database records are synchronized with active audit logging.
-- **Security Context**: Authenticated session verified.
-- **Role Tier**: ${userRole || "Enterprise User"}`;
+  // Only company-provided keys via secure server environment configuration
+  const apiKey = process.env.COMPANY_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "YOUR_GEMINI_API_KEY" || apiKey.trim().length === 0) return null;
+  return new GoogleGenAI({ apiKey: apiKey.trim() });
 }
 
 app.post("/api/ai/ask", requireAuth, async (req: any, res) => {
   try {
     const { prompt, context } = req.body;
     const userRole = req.user.role;
-    let answerText = "";
-    let source = "local-engine";
 
     const ai = getGeminiClient();
-    if (ai) {
-      try {
-        const systemInstruction = `You are the executive AI Intelligence Assistant embedded in "Worqester", a unified enterprise business management SaaS platform.
+    if (!ai) {
+      const notice = "### ℹ️ AI Copilot Disabled\nAI Copilot is currently deactivated pending organization API key configuration (`COMPANY_GEMINI_API_KEY`).\n\nAll core enterprise functionality (CRM Deals, Projects, Milestones, HRM Employees, Tasks, RBAC, and Database Persistence) remains 100% operational without AI dependencies.";
+      return res.json({
+        success: true,
+        enabled: false,
+        source: "disabled",
+        answer: notice,
+        reply: notice,
+      });
+    }
+
+    let answerText = "";
+    let source = "company-gemini";
+    try {
+      const systemInstruction = `You are the executive AI Intelligence Assistant embedded in "Worqester", a unified enterprise business management SaaS platform.
 The user is logged in with role: "${userRole || "User"}".
 Adhere strictly to enterprise data security and RBAC: only discuss data provided in the business context.
 Respond with structured, highly professional, direct answers. Include bullet points, metric callouts, and clear recommendations.
@@ -1191,27 +1181,23 @@ Context of the business:
 ${JSON.stringify(context || {}).slice(0, 15000)}
 `;
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
-          config: {
-            systemInstruction,
-            temperature: 0.3,
-          },
-        });
-        answerText = response.text || "";
-        source = "gemini-2.5-flash";
-      } catch (geminiError: any) {
-        console.warn("Gemini API call failed, gracefully using local intelligence engine:", geminiError?.message);
-      }
-    }
-
-    if (!answerText) {
-      answerText = generateLocalAiResponse(prompt, context, userRole);
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction,
+          temperature: 0.3,
+        },
+      });
+      answerText = response.text || "";
+    } catch (geminiError: any) {
+      console.warn("Company Gemini API call error:", geminiError?.message);
+      answerText = "AI analysis could not be completed with the current organization API configuration.";
     }
 
     return res.json({
       success: true,
+      enabled: true,
       source,
       answer: answerText,
       reply: answerText,

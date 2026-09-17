@@ -434,14 +434,25 @@ app.get("/api/auth/demo-users", async (req, res) => {
 });
 
 app.get("/api/health", async (req, res) => {
-  const db = await getDatabase();
-  return res.json({
-    status: "ok",
-    app: "Worqester Unified Enterprise Platform",
-    version: "2.0.0-relational",
-    database: process.env.DATABASE_URL ? "postgresql" : "sqlite",
-    timestamp: new Date().toISOString(),
-  });
+  try {
+    const db = await getDatabase();
+    return res.json({
+      status: "ok",
+      app: "Worqester Unified Enterprise Platform",
+      version: "2.0.0-relational",
+      database: db.isPostgres() ? "postgresql" : "sqlite",
+      sqliteFallbackActive: !db.isPostgres(),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      status: "error",
+      app: "Worqester Unified Enterprise Platform",
+      version: "2.0.0-relational",
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // ----------------------------------------------------

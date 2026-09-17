@@ -182,6 +182,11 @@ export async function getDatabase(): Promise<DatabaseAdapter> {
     });
     dbInstance = new PostgresAdapter(pool);
   } else {
+    if (process.env.NODE_ENV === "production" && process.env.ALLOW_SQLITE_PROD !== "true") {
+      throw new Error(
+        "[Database Fatal] Running in production requires a valid DATABASE_URL pointing to PostgreSQL. SQLite fallback is strictly prohibited in production environments to avoid ephemeral data loss on container restarts."
+      );
+    }
     console.log("[Database] Initializing SQLite local database (worqester.db)...");
     const { DatabaseSync } = await import("node:sqlite");
     const dbPath = path.resolve(process.cwd(), "worqester.db");

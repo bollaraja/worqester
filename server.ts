@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { fileURLToPath } from "url";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -14,9 +13,6 @@ import {
 } from "./src/server/db";
 
 dotenv.config();
-
-const __filename = typeof import.meta?.url === "string" ? fileURLToPath(import.meta.url) : "";
-const __dirname = __filename ? path.dirname(__filename) : process.cwd();
 
 const app = express();
 const PORT = 3000;
@@ -364,8 +360,9 @@ app.get("/api/crm/deals", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const deals = await db.query(
-      `SELECT d.id, d.title, d.company_name as "companyName", d.amount, d.stage, d.probability,
-              d.expected_close_date as "expectedCloseDate",
+      `SELECT d.id, d.title, d.title as name, d.company_name as "companyName", d.company_name as company,
+              d.amount, d.stage, d.probability,
+              d.expected_close_date as "expectedCloseDate", d.expected_close_date as "closeDate",
               COALESCE(u.name, d.owner_name) as "ownerName", d.owner_id as "ownerId", d.priority
        FROM deals d
        LEFT JOIN users u ON d.owner_id = u.id
@@ -384,12 +381,15 @@ app.post("/api/crm/deals", requireAuth, async (req: any, res) => {
     const d = req.body;
     const id = d.id || `deal-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
+    const title = d.title || d.name || "Untitled Deal";
+    const companyName = d.companyName || d.company || "Enterprise Client";
+    const expectedCloseDate = d.expectedCloseDate || d.closeDate || d.close_date || now.split("T")[0];
     await db.execute(
       `INSERT INTO deals (id, workspace_id, title, company_name, amount, stage, probability, expected_close_date, owner_name, owner_id, priority, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, d.title, d.companyName, d.amount || 0, d.stage || "Qualification", d.probability || 30, d.expectedCloseDate, d.ownerName || req.user.name, d.ownerId || req.user.id, d.priority || "Medium", now, now]
+      [id, req.workspaceId, title, companyName, d.amount || 0, d.stage || "Qualification", d.probability || 30, expectedCloseDate, d.ownerName || req.user.name, d.ownerId || req.user.id, d.priority || "Medium", now, now]
     );
-    return res.status(201).json({ success: true, deal: { ...d, id, ownerName: d.ownerName || req.user.name, ownerId: d.ownerId || req.user.id } });
+    return res.status(201).json({ success: true, deal: { ...d, id, title, name: title, companyName, company: companyName, expectedCloseDate, ownerName: d.ownerName || req.user.name, ownerId: d.ownerId || req.user.id } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -400,11 +400,16 @@ app.put("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const d = req.body;
     const now = new Date().toISOString();
+    const title = d.title || d.name;
+    const companyName = d.companyName || d.company;
+    const expectedCloseDate = d.expectedCloseDate || d.closeDate || d.close_date;
     await db.execute(
-      `UPDATE deals SET title = ?, company_name = ?, amount = ?, stage = ?, probability = ?,
-              expected_close_date = ?, owner_name = ?, owner_id = ?, priority = ?, updated_at = ?
+      `UPDATE deals SET title = COALESCE(?, title), company_name = COALESCE(?, company_name),
+              amount = COALESCE(?, amount), stage = COALESCE(?, stage), probability = COALESCE(?, probability),
+              expected_close_date = COALESCE(?, expected_close_date), owner_name = COALESCE(?, owner_name),
+              owner_id = COALESCE(?, owner_id), priority = COALESCE(?, priority), updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
-      [d.title, d.companyName, d.amount, d.stage, d.probability, d.expectedCloseDate, d.ownerName, d.ownerId || null, d.priority, now, req.params.id, req.workspaceId]
+      [title, companyName, d.amount, d.stage, d.probability, expectedCloseDate, d.ownerName, d.ownerId || null, d.priority, now, req.params.id, req.workspaceId]
     );
     return res.json({ success: true, deal: { ...d, id: req.params.id } });
   } catch (err: any) {
@@ -426,8 +431,8 @@ app.get("/api/crm/leads", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const leads = await db.query(
-      `SELECT l.id, l.contact_name as "contactName", l.company, l.email, l.status,
-              l.expected_value as "expectedValue", l.source, l.score,
+      `SELECT l.id, l.contact_name as "contactName", l.contact_name as name, l.company, l.email, l.status,
+              l.expected_value as "expectedValue", l.expected_value as value, l.source, l.score,
               COALESCE(u.name, l.assigned_to) as "assignedTo", l.assigned_to_id as "assignedToId"
        FROM leads l
        LEFT JOIN users u ON l.assigned_to_id = u.id
@@ -446,12 +451,16 @@ app.post("/api/crm/leads", requireAuth, async (req: any, res) => {
     const l = req.body;
     const id = l.id || `lead-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
+    const contactName = l.contactName || l.name || "Unnamed Contact";
+    const company = l.company || "Enterprise Lead";
+    const email = l.email || "contact@example.com";
+    const expectedValue = l.expectedValue || l.value || 0;
     await db.execute(
       `INSERT INTO leads (id, workspace_id, contact_name, company, email, status, expected_value, source, score, assigned_to, assigned_to_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, l.contactName, l.company, l.email, l.status || "New", l.expectedValue || 0, l.source || "Website", l.score || 50, l.assignedTo || req.user.name, l.assignedToId || req.user.id, now, now]
+      [id, req.workspaceId, contactName, company, email, l.status || "New", expectedValue, l.source || "Website", l.score || 50, l.assignedTo || req.user.name, l.assignedToId || req.user.id, now, now]
     );
-    return res.status(201).json({ success: true, lead: { ...l, id } });
+    return res.status(201).json({ success: true, lead: { ...l, id, contactName, name: contactName, company, email, expectedValue } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -689,6 +698,43 @@ app.get("/api/hrm/employees", requireAuth, async (req: any, res) => {
       [req.workspaceId]
     );
     return res.json({ success: true, employees });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/hrm/employees", requireAuth, requireRole(["Admin", "HR Manager", "Super Admin"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const e = req.body;
+    const id = e.id || `emp-${Date.now().toString(36)}`;
+    const now = new Date().toISOString();
+    const fullName = e.fullName || e.full_name || e.name || "Unnamed Employee";
+    const email = e.email || `${id}@worqester.internal`;
+    const employeeNumber = e.employeeNumber || e.employee_number || `WQ-${Math.floor(1000 + Math.random() * 9000)}`;
+    const department = e.department || "Operations";
+    const designation = e.designation || "Specialist";
+    const salaryBasic = e.salaryBasic || e.salary || 0;
+    const bankAccount = e.bankAccountMasked || e.bank_account_masked || "HDFC •••• 1234";
+    const workMode = e.workMode || e.work_mode || "Hybrid";
+    const location = e.location || "Bangalore HQ";
+
+    await db.execute(
+      `INSERT INTO employees (id, workspace_id, user_id, full_name, email, employee_number, department, designation, salary_basic, bank_account_masked, work_mode, location, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, e.userId || null, fullName, email, employeeNumber, department, designation, salaryBasic, bankAccount, workMode, location, now, now]
+    );
+    return res.status(201).json({ success: true, employee: { ...e, id, fullName, email, employeeNumber } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/hrm/employees/:id", requireAuth, requireRole(["Admin", "HR Manager", "Super Admin"]), async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    await db.execute("DELETE FROM employees WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

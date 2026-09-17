@@ -11,4 +11,5 @@ coverage/
 *.db-wal
 *.db-shm
 scratch/
+backups/
 

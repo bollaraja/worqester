@@ -255,51 +255,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         SettingsApi.getAuditLogs(),
       ]);
 
-      if (dealsRes.status === "fulfilled" && dealsRes.value.length > 0) {
+      if (dealsRes.status === "fulfilled" && Array.isArray(dealsRes.value)) {
         setDeals(dealsRes.value);
         StorageService.saveDeals(dealsRes.value);
       }
-      if (leadsRes.status === "fulfilled" && leadsRes.value.length > 0) {
+      if (leadsRes.status === "fulfilled" && Array.isArray(leadsRes.value)) {
         setLeads(leadsRes.value);
         StorageService.saveLeads(leadsRes.value);
       }
-      if (projectsRes.status === "fulfilled" && projectsRes.value.length > 0) {
+      if (projectsRes.status === "fulfilled" && Array.isArray(projectsRes.value)) {
         setProjects(projectsRes.value);
         StorageService.saveProjects(projectsRes.value);
       }
-      if (milestonesRes.status === "fulfilled" && milestonesRes.value.length > 0) {
+      if (milestonesRes.status === "fulfilled" && Array.isArray(milestonesRes.value)) {
         setMilestones(milestonesRes.value);
         StorageService.saveMilestones(milestonesRes.value);
       }
-      if (tasksRes.status === "fulfilled" && tasksRes.value.length > 0) {
+      if (tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)) {
         setTasks(tasksRes.value);
         StorageService.saveTasks(tasksRes.value);
       }
-      if (employeesRes.status === "fulfilled" && employeesRes.value.length > 0) {
+      if (employeesRes.status === "fulfilled" && Array.isArray(employeesRes.value)) {
         setEmployees(employeesRes.value);
         StorageService.saveEmployees(employeesRes.value);
       }
-      if (expensesRes.status === "fulfilled" && expensesRes.value.length > 0) {
+      if (expensesRes.status === "fulfilled" && Array.isArray(expensesRes.value)) {
         setExpenses(expensesRes.value);
         StorageService.saveExpenses(expensesRes.value);
       }
-      if (assetsRes.status === "fulfilled" && assetsRes.value.length > 0) {
+      if (assetsRes.status === "fulfilled" && Array.isArray(assetsRes.value)) {
         setAssets(assetsRes.value);
         StorageService.saveAssets(assetsRes.value);
       }
-      if (candidatesRes.status === "fulfilled" && candidatesRes.value.length > 0) {
+      if (candidatesRes.status === "fulfilled" && Array.isArray(candidatesRes.value)) {
         setCandidates(candidatesRes.value);
         StorageService.saveCandidates(candidatesRes.value);
       }
-      if (invitationsRes.status === "fulfilled" && invitationsRes.value.length > 0) {
+      if (invitationsRes.status === "fulfilled" && Array.isArray(invitationsRes.value)) {
         setInvitations(invitationsRes.value);
         StorageService.saveInvitations(invitationsRes.value);
       }
-      if (rbacRes.status === "fulfilled" && Object.keys(rbacRes.value).length > 0) {
+      if (rbacRes.status === "fulfilled" && rbacRes.value && typeof rbacRes.value === "object" && Object.keys(rbacRes.value).length > 0) {
         setRbacPermissions(rbacRes.value);
         StorageService.saveRbacPermissions(rbacRes.value);
       }
-      if (auditRes.status === "fulfilled" && auditRes.value.length > 0) {
+      if (auditRes.status === "fulfilled" && Array.isArray(auditRes.value)) {
         setAuditLogs(auditRes.value);
         StorageService.saveAuditLogs(auditRes.value);
       }
@@ -433,6 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         details: `User signed in successfully.`,
       });
       refreshData();
+      await syncFromBackend();
       return { success: true };
     }
     return { success: false, error: res.error || "Invalid credentials." };
@@ -468,6 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         details: `New user account created with role ${res.user.role}.`,
       });
       refreshData();
+      await syncFromBackend();
       return { success: true };
     }
     return { success: false, error: res.error || "Failed to create account." };

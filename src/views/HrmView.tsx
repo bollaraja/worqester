@@ -559,9 +559,7 @@ export const HrmView: React.FC = () => {
               const salaryDisplay =
                 typeof pos.salaryRange === "string"
                   ? pos.salaryRange
-                  : `${formatCurrency(pos.salaryRange?.min || 1500000)} - ${formatCurrency(
-                      pos.salaryRange?.max || 2500000
-                    )}`;
+                  : "₹15,00,000 - ₹25,00,000";
 
               return (
                 <div

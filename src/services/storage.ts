@@ -273,6 +273,11 @@ export class StorageService {
     this.save(STORAGE_KEYS.AUDIT_LOGS, list.slice(0, 200));
   }
 
+  static saveAuditLogs(items: AuditLogItem[]): void {
+    this.save(STORAGE_KEYS.AUDIT_LOGS, items);
+  }
+
+
   static getAutomations(): AutomationRule[] {
     return this.load(STORAGE_KEYS.AUTOMATIONS, initialAutomations);
   }
@@ -423,3 +428,4 @@ export class StorageService {
     };
   }
 }
+

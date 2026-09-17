@@ -1528,7 +1528,7 @@ export const initialExpenses: Expense[] = [
     id: "exp-04",
     employeeId: "emp-05",
     employeeName: "Vikram Patel",
-    category: "Hardware",
+    category: "Office",
     amount: 5400,
     date: "2026-09-02",
     description: "Ergonomic keyboard and USB-C multiport adapter reimbursement claim.",

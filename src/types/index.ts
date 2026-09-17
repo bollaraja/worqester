@@ -32,25 +32,28 @@ export type PriorityLevel = "Critical" | "High" | "Medium" | "Low";
 
 export interface Company {
   id: string;
-  organizationId: string;
+  organizationId?: string;
   name: string;
   industry: string;
-  website: string;
-  phone: string;
-  email: string;
-  address: string;
+  website?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
   location?: string;
-  employeesCount: number;
-  annualRevenue: number;
-  ownerId: string;
-  ownerName: string;
-  health: HealthStatus;
+  country?: string;
+  employeesCount?: number;
+  annualRevenue?: number;
+  revenue?: number;
+  ownerId?: string;
+  ownerName?: string;
+  primaryContact?: string;
+  health?: HealthStatus;
   status?: string;
   tier?: string;
   healthReason?: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
+  tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
   isDeleted?: boolean;
 }
 
@@ -129,7 +132,8 @@ export type ProjectStatus =
   | "On Hold"
   | "At Risk"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | (string & {});
 
 export interface Project {
   id: string;
@@ -315,9 +319,14 @@ export interface Asset {
 
 export interface DocumentItem {
   id: string;
-  name: string;
-  category: "Contracts" | "Proposals" | "Policies" | "Project" | "Employee" | "Invoices";
-  size: string;
+  name?: string;
+  title?: string;
+  category?: "Contracts" | "Proposals" | "Policies" | "Project" | "Employee" | "Invoices" | string;
+  size?: string;
+  fileName?: string;
+  fileSize?: string;
+  fileType?: string;
+  version?: string;
   uploadedBy: string;
   uploadedAt: string;
   expiryDate?: string;
@@ -363,7 +372,11 @@ export interface AutomationRule {
   trigger: string;
   condition: string;
   action: string;
-  enabled: boolean;
+  enabled?: boolean;
+  category?: string;
+  lastTriggered?: string;
+  executionCount?: number;
+  active?: boolean;
 }
 
 export interface SystemSettings {
@@ -373,7 +386,7 @@ export interface SystemSettings {
   currencySymbol: string;
   timezone: string;
   theme: "dark" | "light";
-  enabledModules: {
+  enabledModules?: {
     crm: boolean;
     projects: boolean;
     tasks: boolean;
@@ -387,6 +400,7 @@ export interface SystemSettings {
     ai: boolean;
     automations: boolean;
   };
+  modulesEnabled?: Record<string, boolean>;
 }
 
 export interface Milestone {
@@ -402,10 +416,12 @@ export interface Milestone {
 
 export interface UserInvitation {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   role: UserRole;
   department: string;
   status: "Pending" | "Accepted";
-  invitedAt: string;
+  invitedAt?: string;
+  invitedBy?: string;
+  sentDate?: string;
 }

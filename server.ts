@@ -357,15 +357,19 @@ app.get("/api/health", async (req, res) => {
 });
 
 // ----------------------------------------------------
+// ----------------------------------------------------
 // CRM APIs (Deals & Leads)
 // ----------------------------------------------------
 app.get("/api/crm/deals", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const deals = await db.query(
-      `SELECT id, title, company_name as "companyName", amount, stage, probability,
-              expected_close_date as "expectedCloseDate", owner_name as "ownerName", priority
-       FROM deals WHERE workspace_id = ? ORDER BY created_at DESC`,
+      `SELECT d.id, d.title, d.company_name as "companyName", d.amount, d.stage, d.probability,
+              d.expected_close_date as "expectedCloseDate",
+              COALESCE(u.name, d.owner_name) as "ownerName", d.owner_id as "ownerId", d.priority
+       FROM deals d
+       LEFT JOIN users u ON d.owner_id = u.id
+       WHERE d.workspace_id = ? ORDER BY d.created_at DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, deals });
@@ -380,12 +384,12 @@ app.post("/api/crm/deals", requireAuth, async (req: any, res) => {
     const d = req.body;
     const id = d.id || `deal-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO deals (id, workspace_id, title, company_name, amount, stage, probability, expected_close_date, owner_name, priority, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, d.title, d.companyName, d.amount || 0, d.stage || "Qualification", d.probability || 30, d.expectedCloseDate, d.ownerName || req.user.name, d.priority || "Medium", now, now]
+    await db.execute(
+      `INSERT INTO deals (id, workspace_id, title, company_name, amount, stage, probability, expected_close_date, owner_name, owner_id, priority, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, d.title, d.companyName, d.amount || 0, d.stage || "Qualification", d.probability || 30, d.expectedCloseDate, d.ownerName || req.user.name, d.ownerId || req.user.id, d.priority || "Medium", now, now]
     );
-    return res.status(201).json({ success: true, deal: { ...d, id } });
+    return res.status(201).json({ success: true, deal: { ...d, id, ownerName: d.ownerName || req.user.name, ownerId: d.ownerId || req.user.id } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -396,11 +400,11 @@ app.put("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const d = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE deals SET title = ?, company_name = ?, amount = ?, stage = ?, probability = ?,
-              expected_close_date = ?, owner_name = ?, priority = ?, updated_at = ?
+              expected_close_date = ?, owner_name = ?, owner_id = ?, priority = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
-      [d.title, d.companyName, d.amount, d.stage, d.probability, d.expectedCloseDate, d.ownerName, d.priority, now, req.params.id, req.workspaceId]
+      [d.title, d.companyName, d.amount, d.stage, d.probability, d.expectedCloseDate, d.ownerName, d.ownerId || null, d.priority, now, req.params.id, req.workspaceId]
     );
     return res.json({ success: true, deal: { ...d, id: req.params.id } });
   } catch (err: any) {
@@ -411,7 +415,7 @@ app.put("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
 app.delete("/api/crm/deals/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM deals WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM deals WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -422,9 +426,12 @@ app.get("/api/crm/leads", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const leads = await db.query(
-      `SELECT id, contact_name as "contactName", company, email, status,
-              expected_value as "expectedValue", source, score, assigned_to as "assignedTo"
-       FROM leads WHERE workspace_id = ? ORDER BY created_at DESC`,
+      `SELECT l.id, l.contact_name as "contactName", l.company, l.email, l.status,
+              l.expected_value as "expectedValue", l.source, l.score,
+              COALESCE(u.name, l.assigned_to) as "assignedTo", l.assigned_to_id as "assignedToId"
+       FROM leads l
+       LEFT JOIN users u ON l.assigned_to_id = u.id
+       WHERE l.workspace_id = ? ORDER BY l.created_at DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, leads });
@@ -439,10 +446,10 @@ app.post("/api/crm/leads", requireAuth, async (req: any, res) => {
     const l = req.body;
     const id = l.id || `lead-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO leads (id, workspace_id, contact_name, company, email, status, expected_value, source, score, assigned_to, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, l.contactName, l.company, l.email, l.status || "New", l.expectedValue || 0, l.source || "Website", l.score || 50, l.assignedTo || req.user.name, now, now]
+    await db.execute(
+      `INSERT INTO leads (id, workspace_id, contact_name, company, email, status, expected_value, source, score, assigned_to, assigned_to_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, l.contactName, l.company, l.email, l.status || "New", l.expectedValue || 0, l.source || "Website", l.score || 50, l.assignedTo || req.user.name, l.assignedToId || req.user.id, now, now]
     );
     return res.status(201).json({ success: true, lead: { ...l, id } });
   } catch (err: any) {
@@ -455,11 +462,11 @@ app.put("/api/crm/leads/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const l = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE leads SET contact_name = ?, company = ?, email = ?, status = ?,
-              expected_value = ?, source = ?, score = ?, assigned_to = ?, updated_at = ?
+              expected_value = ?, source = ?, score = ?, assigned_to = ?, assigned_to_id = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
-      [l.contactName, l.company, l.email, l.status, l.expectedValue, l.source, l.score, l.assignedTo, now, req.params.id, req.workspaceId]
+      [l.contactName, l.company, l.email, l.status, l.expectedValue, l.source, l.score, l.assignedTo, l.assignedToId || null, now, req.params.id, req.workspaceId]
     );
     return res.json({ success: true, lead: { ...l, id: req.params.id } });
   } catch (err: any) {
@@ -470,7 +477,7 @@ app.put("/api/crm/leads/:id", requireAuth, async (req: any, res) => {
 app.delete("/api/crm/leads/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM leads WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM leads WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -484,9 +491,12 @@ app.get("/api/projects", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const projects = await db.query(
-      `SELECT id, name, code, status, health, budget, spent, owner_name as "ownerName",
-              progress, start_date as "startDate", end_date as "endDate"
-       FROM projects WHERE workspace_id = ? ORDER BY created_at DESC`,
+      `SELECT p.id, p.name, p.code, p.status, p.health, p.budget, p.spent,
+              COALESCE(u.name, p.owner_name) as "ownerName", p.owner_id as "ownerId",
+              p.progress, p.start_date as "startDate", p.end_date as "endDate"
+       FROM projects p
+       LEFT JOIN users u ON p.owner_id = u.id
+       WHERE p.workspace_id = ? ORDER BY p.created_at DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, projects });
@@ -501,12 +511,12 @@ app.post("/api/projects", requireAuth, async (req: any, res) => {
     const p = req.body;
     const id = p.id || `proj-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO projects (id, workspace_id, name, code, status, health, budget, spent, owner_name, progress, start_date, end_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, p.name, p.code, p.status || "In Progress", p.health || "Healthy", p.budget || 0, p.spent || 0, p.ownerName || req.user.name, p.progress || 0, p.startDate, p.endDate, now, now]
+    await db.execute(
+      `INSERT INTO projects (id, workspace_id, name, code, status, health, budget, spent, owner_name, owner_id, progress, start_date, end_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, p.name, p.code, p.status || "In Progress", p.health || "Healthy", p.budget || 0, p.spent || 0, p.ownerName || req.user.name, p.ownerId || req.user.id, p.progress || 0, p.startDate, p.endDate, now, now]
     );
-    return res.status(201).json({ success: true, project: { ...p, id } });
+    return res.status(201).json({ success: true, project: { ...p, id, ownerName: p.ownerName || req.user.name } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -517,11 +527,11 @@ app.put("/api/projects/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const p = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE projects SET name = ?, code = ?, status = ?, health = ?, budget = ?,
-              spent = ?, owner_name = ?, progress = ?, start_date = ?, end_date = ?, updated_at = ?
+              spent = ?, owner_name = ?, owner_id = ?, progress = ?, start_date = ?, end_date = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
-      [p.name, p.code, p.status, p.health, p.budget, p.spent, p.ownerName, p.progress, p.startDate, p.endDate, now, req.params.id, req.workspaceId]
+      [p.name, p.code, p.status, p.health, p.budget, p.spent, p.ownerName, p.ownerId || null, p.progress, p.startDate, p.endDate, now, req.params.id, req.workspaceId]
     );
     return res.json({ success: true, project: { ...p, id: req.params.id } });
   } catch (err: any) {
@@ -532,8 +542,7 @@ app.put("/api/projects/:id", requireAuth, async (req: any, res) => {
 app.delete("/api/projects/:id", requireAuth, requireRole(["Admin", "Project Manager"]), async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM projects WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
-    await db.query("DELETE FROM milestones WHERE project_id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM projects WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -544,9 +553,11 @@ app.get("/api/milestones", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const milestones = await db.query(
-      `SELECT id, project_id as "projectId", project_name as "projectName", title,
-              due_date as "dueDate", status, deliverable_type as "deliverableType"
-       FROM milestones WHERE workspace_id = ? ORDER BY due_date ASC`,
+      `SELECT m.id, m.project_id as "projectId", COALESCE(p.name, 'General Project') as "projectName",
+              m.title, m.due_date as "dueDate", m.status, m.deliverable_type as "deliverableType"
+       FROM milestones m
+       LEFT JOIN projects p ON m.project_id = p.id
+       WHERE m.workspace_id = ? ORDER BY m.due_date ASC`,
       [req.workspaceId]
     );
     return res.json({ success: true, milestones });
@@ -561,10 +572,10 @@ app.post("/api/milestones", requireAuth, async (req: any, res) => {
     const m = req.body;
     const id = m.id || `mls-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO milestones (id, workspace_id, project_id, project_name, title, due_date, status, deliverable_type, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, m.projectId, m.projectName, m.title, m.dueDate, m.status || "In Progress", m.deliverableType || "Milestone", now, now]
+    await db.execute(
+      `INSERT INTO milestones (id, workspace_id, project_id, title, due_date, status, deliverable_type, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, m.projectId, m.title, m.dueDate, m.status || "In Progress", m.deliverableType || "Milestone", now, now]
     );
     return res.status(201).json({ success: true, milestone: { ...m, id } });
   } catch (err: any) {
@@ -577,7 +588,7 @@ app.put("/api/milestones/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const m = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE milestones SET title = ?, due_date = ?, status = ?, deliverable_type = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
       [m.title, m.dueDate, m.status, m.deliverableType, now, req.params.id, req.workspaceId]
@@ -591,7 +602,7 @@ app.put("/api/milestones/:id", requireAuth, async (req: any, res) => {
 app.delete("/api/milestones/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM milestones WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM milestones WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -605,10 +616,13 @@ app.get("/api/tasks", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const tasks = await db.query(
-      `SELECT id, project_id as "projectId", project_name as "projectName", title, description,
-              assignee_id as "assigneeId", assignee_name as "assigneeName", priority, status,
-              due_date as "dueDate", estimated_hours as "estimatedHours", actual_hours as "actualHours"
-       FROM tasks WHERE workspace_id = ? ORDER BY created_at DESC`,
+      `SELECT t.id, t.project_id as "projectId", COALESCE(p.name, 'General Project') as "projectName",
+              t.title, t.description, t.assignee_id as "assigneeId", COALESCE(u.name, 'Unassigned') as "assigneeName",
+              t.priority, t.status, t.due_date as "dueDate", t.estimated_hours as "estimatedHours", t.actual_hours as "actualHours"
+       FROM tasks t
+       LEFT JOIN projects p ON t.project_id = p.id
+       LEFT JOIN users u ON t.assignee_id = u.id
+       WHERE t.workspace_id = ? ORDER BY t.created_at DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, tasks });
@@ -623,10 +637,10 @@ app.post("/api/tasks", requireAuth, async (req: any, res) => {
     const t = req.body;
     const id = t.id || `tsk-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO tasks (id, workspace_id, project_id, project_name, title, description, assignee_id, assignee_name, priority, status, due_date, estimated_hours, actual_hours, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, t.projectId, t.projectName, t.title, t.description || "", t.assigneeId || req.user.user_id, t.assigneeName || req.user.name, t.priority || "Medium", t.status || "To Do", t.dueDate, t.estimatedHours || 0, t.actualHours || 0, now, now]
+    await db.execute(
+      `INSERT INTO tasks (id, workspace_id, project_id, title, description, assignee_id, priority, status, due_date, estimated_hours, actual_hours, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, t.projectId, t.title, t.description || "", t.assigneeId || req.user.id, t.priority || "Medium", t.status || "To Do", t.dueDate, t.estimatedHours || 0, t.actualHours || 0, now, now]
     );
     return res.status(201).json({ success: true, task: { ...t, id } });
   } catch (err: any) {
@@ -639,7 +653,7 @@ app.put("/api/tasks/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const t = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE tasks SET title = ?, description = ?, priority = ?, status = ?, due_date = ?,
               estimated_hours = ?, actual_hours = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
@@ -654,7 +668,7 @@ app.put("/api/tasks/:id", requireAuth, async (req: any, res) => {
 app.delete("/api/tasks/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM tasks WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM tasks WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -685,7 +699,7 @@ app.put("/api/hrm/employees/:id", requireAuth, requireRole(["Admin", "HR Manager
     const db = await getDatabase();
     const e = req.body;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `UPDATE employees SET full_name = ?, department = ?, designation = ?, salary_basic = ?,
               bank_account_masked = ?, work_mode = ?, location = ?, updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
@@ -701,9 +715,13 @@ app.get("/api/hrm/expenses", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const expenses = await db.query(
-      `SELECT id, employee_id as "employeeId", employee_name as "employeeName", category,
-              amount, date, description, project_name as "projectName", status
-       FROM expenses WHERE workspace_id = ? ORDER BY date DESC`,
+      `SELECT exp.id, exp.employee_id as "employeeId", COALESCE(e.full_name, 'Staff Member') as "employeeName",
+              exp.category, exp.amount, exp.date, exp.description,
+              exp.project_id as "projectId", COALESCE(p.name, 'General Operations') as "projectName", exp.status
+       FROM expenses exp
+       LEFT JOIN employees e ON exp.employee_id = e.id
+       LEFT JOIN projects p ON exp.project_id = p.id
+       WHERE exp.workspace_id = ? ORDER BY exp.date DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, expenses });
@@ -718,10 +736,10 @@ app.post("/api/hrm/expenses", requireAuth, async (req: any, res) => {
     const exp = req.body;
     const id = exp.id || `exp-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO expenses (id, workspace_id, employee_id, employee_name, category, amount, date, description, project_name, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, exp.employeeId || req.user.user_id, exp.employeeName || req.user.name, exp.category || "General", exp.amount || 0, exp.date || now.split("T")[0], exp.description || "", exp.projectName || "General Operations", "Pending", now, now]
+    await db.execute(
+      `INSERT INTO expenses (id, workspace_id, employee_id, category, amount, date, description, project_id, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, exp.employeeId || null, exp.category || "General", exp.amount || 0, exp.date || now.split("T")[0], exp.description || "", exp.projectId || null, "Pending", now, now]
     );
     return res.status(201).json({ success: true, expense: { ...exp, id, status: "Pending" } });
   } catch (err: any) {
@@ -737,7 +755,7 @@ app.patch("/api/hrm/expenses/:id/status", requireAuth, requireRole(["Admin", "HR
     }
     const db = await getDatabase();
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       "UPDATE expenses SET status = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
       [status, now, req.params.id, req.workspaceId]
     );
@@ -751,9 +769,12 @@ app.get("/api/hrm/assets", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const assets = await db.query(
-      `SELECT id, name, category, serial_number as "serialNumber", employee_id as "employeeId",
-              employee_name as "employeeName", condition, status, allocated_date as "allocatedDate"
-       FROM assets WHERE workspace_id = ? ORDER BY created_at DESC`,
+      `SELECT a.id, a.name, a.category, a.serial_number as "serialNumber", a.employee_id as "employeeId",
+              COALESCE(e.full_name, 'Unassigned') as "employeeName", a.condition, a.status,
+              a.allocated_date as "allocatedDate"
+       FROM assets a
+       LEFT JOIN employees e ON a.employee_id = e.id
+       WHERE a.workspace_id = ? ORDER BY a.created_at DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, assets });
@@ -768,10 +789,10 @@ app.post("/api/hrm/assets", requireAuth, async (req: any, res) => {
     const a = req.body;
     const id = a.id || `ast-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO assets (id, workspace_id, name, category, serial_number, employee_id, employee_name, condition, status, allocated_date, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, a.name, a.category || "Hardware", a.serialNumber || `SN-${Date.now()}`, a.employeeId, a.employeeName, a.condition || "New", a.status || "Assigned", a.allocatedDate || now.split("T")[0], now, now]
+    await db.execute(
+      `INSERT INTO assets (id, workspace_id, name, category, serial_number, employee_id, condition, status, allocated_date, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, a.name, a.category || "Hardware", a.serialNumber || `SN-${Date.now()}`, a.employeeId || null, a.condition || "New", a.status || "Assigned", a.allocatedDate || now.split("T")[0], now, now]
     );
     return res.status(201).json({ success: true, asset: { ...a, id } });
   } catch (err: any) {
@@ -782,7 +803,7 @@ app.post("/api/hrm/assets", requireAuth, async (req: any, res) => {
 app.delete("/api/hrm/assets/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM assets WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM assets WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -807,9 +828,12 @@ app.get("/api/hrm/candidates", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const candidates = await db.query(
-      `SELECT id, position_id as "positionId", name, email, experience_years as "experienceYears",
-              rating, stage, applied_date as "appliedDate"
-       FROM candidates WHERE workspace_id = ? ORDER BY applied_date DESC`,
+      `SELECT c.id, c.position_id as "positionId", COALESCE(jp.title, 'Open Position') as "positionTitle",
+              c.name, c.email, c.experience_years as "experienceYears",
+              c.rating, c.stage, c.applied_date as "appliedDate"
+       FROM candidates c
+       LEFT JOIN job_positions jp ON c.position_id = jp.id
+       WHERE c.workspace_id = ? ORDER BY c.applied_date DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, candidates });
@@ -824,7 +848,7 @@ app.post("/api/hrm/candidates", requireAuth, async (req: any, res) => {
     const c = req.body;
     const id = c.id || `cnd-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       `INSERT INTO candidates (id, workspace_id, position_id, name, email, experience_years, rating, stage, applied_date, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, req.workspaceId, c.positionId, c.name, c.email, c.experienceYears || 0, c.rating || 4.5, c.stage || "Screening", now.split("T")[0], now, now]
@@ -840,7 +864,7 @@ app.patch("/api/hrm/candidates/:id/stage", requireAuth, async (req: any, res) =>
     const { stage } = req.body;
     const db = await getDatabase();
     const now = new Date().toISOString();
-    await db.query(
+    await db.execute(
       "UPDATE candidates SET stage = ?, updated_at = ? WHERE id = ? AND workspace_id = ?",
       [stage, now, req.params.id, req.workspaceId]
     );
@@ -853,7 +877,7 @@ app.patch("/api/hrm/candidates/:id/stage", requireAuth, async (req: any, res) =>
 app.delete("/api/hrm/candidates/:id", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM candidates WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM candidates WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
@@ -867,8 +891,11 @@ app.get("/api/settings/invitations", requireAuth, async (req: any, res) => {
   try {
     const db = await getDatabase();
     const invitations = await db.query(
-      `SELECT id, email, role, department, invited_by as "invitedBy", status, sent_date as "sentDate"
-       FROM invitations WHERE workspace_id = ? ORDER BY sent_date DESC`,
+      `SELECT i.id, i.email, i.role, i.department, COALESCE(u.name, i.invited_by) as "invitedBy",
+              i.status, i.sent_date as "sentDate"
+       FROM invitations i
+       LEFT JOIN users u ON i.invited_by_id = u.id
+       WHERE i.workspace_id = ? ORDER BY i.sent_date DESC`,
       [req.workspaceId]
     );
     return res.json({ success: true, invitations });
@@ -877,16 +904,16 @@ app.get("/api/settings/invitations", requireAuth, async (req: any, res) => {
   }
 });
 
-app.post("/api/settings/invitations", requireAuth, requireRole(["Admin", "Executive"]), async (req: any, res) => {
+app.post("/api/settings/invitations", requireAuth, requireRole(["Admin", "Executive", "Super Admin"]), async (req: any, res) => {
   try {
     const db = await getDatabase();
     const inv = req.body;
     const id = inv.id || `inv-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
-    await db.query(
-      `INSERT INTO invitations (id, workspace_id, email, role, department, invited_by, status, sent_date, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, inv.email, inv.role || "Employee", inv.department || "Operations", req.user.name, "Pending", now.split("T")[0], now]
+    await db.execute(
+      `INSERT INTO invitations (id, workspace_id, email, role, department, invited_by, invited_by_id, status, sent_date, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, inv.email, inv.role || "Employee", inv.department || "Operations", req.user.name, req.user.id, "Pending", now.split("T")[0], now]
     );
     return res.status(201).json({ success: true, invitation: { ...inv, id, status: "Pending", invitedBy: req.user.name, sentDate: now.split("T")[0] } });
   } catch (err: any) {
@@ -894,10 +921,10 @@ app.post("/api/settings/invitations", requireAuth, requireRole(["Admin", "Execut
   }
 });
 
-app.delete("/api/settings/invitations/:id", requireAuth, requireRole(["Admin", "Executive"]), async (req: any, res) => {
+app.delete("/api/settings/invitations/:id", requireAuth, requireRole(["Admin", "Executive", "Super Admin"]), async (req: any, res) => {
   try {
     const db = await getDatabase();
-    await db.query("DELETE FROM invitations WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    await db.execute("DELETE FROM invitations WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
     return res.json({ success: true, id: req.params.id });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });

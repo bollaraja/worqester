@@ -397,7 +397,7 @@ export const SettingsView: React.FC = () => {
                   {Object.entries(rbacPermissions).map(([capability, roles], idx) => (
                     <tr key={idx} className="hover:bg-slate-800/30">
                       <td className="py-3 font-medium text-white">{capability}</td>
-                      {roles.map((granted, rIdx) => (
+                      {(roles as boolean[]).map((granted, rIdx) => (
                         <td key={rIdx} className="py-3 text-center">
                           <button
                             type="button"

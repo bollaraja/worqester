@@ -557,6 +557,7 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
           UNIQUE (workspace_id, employee_number)
         );
       `);
+      await addColumnIfNotExists(tx, "employees", "user_id", "VARCHAR(64)");
 
       // 10. Expenses (foreign key to employees & projects)
       await tx.execute(`
@@ -724,5 +725,15 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
       }
     }
     console.log("[Database Migration] Successfully applied 001_normalized_relational_schema.");
+  }
+
+  if (!applied.has("002_add_employee_user_id")) {
+    console.log("[Database Migration] Applying 002_add_employee_user_id...");
+    await db.transaction(async (tx) => {
+      await addColumnIfNotExists(tx, "employees", "user_id", "VARCHAR(64)");
+      await tx.execute("CREATE INDEX IF NOT EXISTS idx_employees_ws_user ON employees(workspace_id, user_id);");
+      await tx.execute("INSERT INTO schema_migrations (version) VALUES (?)", ["002_add_employee_user_id"]);
+    });
+    console.log("[Database Migration] Successfully applied 002_add_employee_user_id.");
   }
 }

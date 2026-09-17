@@ -22,8 +22,10 @@ import {
   FileCheck,
   CheckCircle2,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Lead, Deal, Company, Contact } from "../types";
+import { EditDealModal, EditLeadModal } from "../components/modals/EditModals";
 
 export const CrmView: React.FC = () => {
   const {
@@ -43,8 +45,11 @@ export const CrmView: React.FC = () => {
     selectedEntityId,
   } = useApp();
 
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+
   // Active tab within CRM
-  const activeSubView = currentSubView || "pipeline";
+  const activeSubView = currentSubView === "deals" ? "pipeline" : (currentSubView || "pipeline");
 
   // Deals Kanban columns
   const dealStages = [
@@ -70,7 +75,7 @@ export const CrmView: React.FC = () => {
 
   // Customer 360 target account
   const customer360Company =
-    companies.find((c) => c.id === selectedEntityId) || companies[0];
+    companies.find((c) => c.id === selectedEntityId) || companies[0] || null;
 
   // Lead Columns
   const leadColumns: Column<Lead>[] = [
@@ -151,6 +156,14 @@ export const CrmView: React.FC = () => {
               Convert to Deal
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setEditingLead(l)}
+            className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors"
+            title="Edit Lead"
+          >
+            <Pencil size={13} />
+          </button>
           <button
             type="button"
             onClick={() => deleteItem("lead", l.id)}
@@ -436,11 +449,29 @@ export const CrmView: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Stage transition controls */}
+                        {/* Stage transition & edit controls */}
                         <div className="mt-2 pt-2 border-t border-slate-800/40 flex items-center justify-between">
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {deal.expectedCloseDate}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {deal.expectedCloseDate}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingDeal(deal)}
+                              className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors"
+                              title="Edit Deal"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteItem("deal", deal.id)}
+                              className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                              title="Delete Deal"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
                           {stage !== "Closed Won" && (
                             <button
                               type="button"
@@ -498,7 +529,22 @@ export const CrmView: React.FC = () => {
       )}
 
       {/* VIEW: CUSTOMER 360 */}
-      {activeSubView === "customer360" && (
+      {activeSubView === "customer360" && !customer360Company && (
+        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-8 text-center space-y-3">
+          <Building2 size={32} className="mx-auto text-slate-500" />
+          <h3 className="text-sm font-bold text-white">No Enterprise Accounts Available</h3>
+          <p className="text-xs text-slate-400">Create a company account first to view 360 operational analytics.</p>
+          <button
+            type="button"
+            onClick={() => openCreateModal("company")}
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+          >
+            + Create Company Account
+          </button>
+        </div>
+      )}
+
+      {activeSubView === "customer360" && customer360Company && (
         <div className="space-y-6">
           {/* Account Profile Banner */}
           <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md">
@@ -707,6 +753,32 @@ export const CrmView: React.FC = () => {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Edit Deal Modal */}
+      {editingDeal && (
+        <EditDealModal
+          deal={editingDeal}
+          isOpen={true}
+          onClose={() => setEditingDeal(null)}
+          onSave={(updated) => {
+            updateDeal(editingDeal.id, updated);
+            setEditingDeal(null);
+          }}
+        />
+      )}
+
+      {/* Edit Lead Modal */}
+      {editingLead && (
+        <EditLeadModal
+          lead={editingLead}
+          isOpen={true}
+          onClose={() => setEditingLead(null)}
+          onSave={(updated) => {
+            updateLead(editingLead.id, updated);
+            setEditingLead(null);
+          }}
+        />
       )}
     </div>
   );

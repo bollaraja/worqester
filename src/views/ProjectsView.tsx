@@ -23,8 +23,11 @@ import {
   BarChart3,
   CalendarDays,
   Sparkles,
+  Pencil,
+  Check,
 } from "lucide-react";
-import { Project, Task } from "../types";
+import { Project, Task, Milestone } from "../types";
+import { EditProjectModal, AddMilestoneModal } from "../components/modals/EditModals";
 
 export const ProjectsView: React.FC = () => {
   const {
@@ -38,7 +41,14 @@ export const ProjectsView: React.FC = () => {
     tasks,
     toggleTaskCompletion,
     setTaskDueDate,
+    milestones,
+    createMilestone,
+    updateMilestone,
+    deleteMilestone,
   } = useApp();
+
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isAddMilestoneOpen, setIsAddMilestoneOpen] = useState(false);
 
   const activeSubView = currentSubView || "cards";
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -197,6 +207,14 @@ export const ProjectsView: React.FC = () => {
             className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-medium transition-colors cursor-pointer"
           >
             + Add Task
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingProject(p)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+            title="Edit Project"
+          >
+            <Pencil size={14} />
           </button>
           <button
             type="button"
@@ -375,6 +393,14 @@ export const ProjectsView: React.FC = () => {
                       >
                         <Plus size={13} />
                         <span>Add Task</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingProject(project)}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        title="Edit project"
+                      >
+                        <Pencil size={15} />
                       </button>
                       <button
                         type="button"
@@ -675,52 +701,116 @@ export const ProjectsView: React.FC = () => {
               <h3 className="text-sm font-bold text-slate-900">Project Deliverable Milestones</h3>
               <p className="text-xs text-slate-500">Formal contractual deliverables and verification gates</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsAddMilestoneOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Add Milestone</span>
+            </button>
           </div>
 
           <div className="space-y-3">
-            {[
-              {
-                title: "V1 Cloud Ingestion Architecture & Kafka Pipeline",
-                project: "Cloud Portal Migration (PRJ-101)",
-                date: "2026-09-30",
-                status: "In Progress",
-                weight: "25% Payment Milestone",
-              },
-              {
-                title: "SOC2 Type II Audit Compliance Report Acceptance",
-                project: "SOC2 Security Hardening (PRJ-102)",
-                date: "2026-10-15",
-                status: "Pending Review",
-                weight: "Final Sign-off",
-              },
-              {
-                title: "Core Platform Modernization Alpha Release",
-                project: "NextGen ERP Engine (PRJ-103)",
-                date: "2026-11-20",
-                status: "Planning",
-                weight: "40% Deliverable",
-              },
-            ].map((m, i) => (
-              <div
-                key={i}
-                className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
-              >
-                <div className="space-y-1">
-                  <div className="font-bold text-slate-900">{m.title}</div>
-                  <div className="text-slate-500 text-[11px] flex items-center gap-3">
-                    <span>{m.project}</span>
-                    <span>•</span>
-                    <span className="text-amber-700 font-mono font-semibold">{m.weight}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-slate-500">{m.date}</span>
-                  <StatusBadge status={m.status} size="sm" />
-                </div>
+            {milestones.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                No milestones recorded yet. Click &quot;Add Milestone&quot; to establish strategic gates.
               </div>
-            ))}
+            ) : (
+              milestones.map((m) => {
+                const isCompleted = m.status === "Completed";
+                return (
+                  <div
+                    key={m.id}
+                    className={`p-4 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                      isCompleted ? "bg-slate-50/70 border-slate-200" : "bg-white border-slate-200 shadow-xs"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* 1-Click Status Toggle Checkbox */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateMilestone(m.id, {
+                            status: isCompleted ? "In Progress" : "Completed",
+                          })
+                        }
+                        className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+                          isCompleted
+                            ? "bg-emerald-600 border-emerald-600 text-white"
+                            : "border-slate-300 hover:border-blue-500 bg-white"
+                        }`}
+                        title={isCompleted ? "Mark In Progress" : "Mark Completed"}
+                      >
+                        {isCompleted && <Check size={12} strokeWidth={3} />}
+                      </button>
+
+                      <div className="space-y-0.5">
+                        <div className={`font-bold ${isCompleted ? "line-through text-slate-400" : "text-slate-900"}`}>
+                          {m.name}
+                        </div>
+                        <div className="text-slate-500 text-[11px] flex items-center gap-2">
+                          <span className="font-semibold text-slate-700">{m.projectName}</span>
+                          {m.weight && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-700 font-mono font-semibold">{m.weight}</span>
+                            </>
+                          )}
+                          {m.description && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-500">{m.description}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-slate-500 text-xs">{m.dueDate}</span>
+                      <StatusBadge status={m.status} size="sm" />
+                      <button
+                        type="button"
+                        onClick={() => deleteMilestone(m.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Delete milestone"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
+      )}
+
+      {/* Edit Project Modal */}
+      {editingProject && (
+        <EditProjectModal
+          project={editingProject}
+          isOpen={true}
+          onClose={() => setEditingProject(null)}
+          onSave={(updated) => {
+            updateProject(editingProject.id, updated);
+            setEditingProject(null);
+          }}
+        />
+      )}
+
+      {/* Add Milestone Modal */}
+      {isAddMilestoneOpen && (
+        <AddMilestoneModal
+          projects={projects}
+          isOpen={true}
+          onClose={() => setIsAddMilestoneOpen(false)}
+          onSave={(data) => {
+            createMilestone(data);
+            setIsAddMilestoneOpen(false);
+          }}
+        />
       )}
     </div>
   );

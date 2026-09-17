@@ -20,6 +20,8 @@ import {
   AutomationRule,
   SystemSettings,
   User,
+  Milestone,
+  UserInvitation,
 } from "../types";
 
 export const initialUsers: User[] = [
@@ -1522,6 +1524,17 @@ export const initialExpenses: Expense[] = [
     projectName: "Cloud Infrastructure Modernization",
     status: "Approved",
   },
+  {
+    id: "exp-04",
+    employeeId: "emp-05",
+    employeeName: "Vikram Patel",
+    category: "Office",
+    amount: 5400,
+    date: "2026-09-02",
+    description: "Ergonomic keyboard and USB-C multiport adapter reimbursement claim.",
+    projectName: "Cloud Infrastructure Modernization",
+    status: "Pending",
+  },
 ];
 
 export const initialAssets: Asset[] = [
@@ -1756,5 +1769,59 @@ export const initialAutomations: AutomationRule[] = [
     condition: "IF Category is 'Contracts' or 'Policies'",
     action: "THEN Create Notification for Legal and Account Owner",
     enabled: true,
+  },
+];
+
+export const initialMilestones: Milestone[] = [
+  {
+    id: "mls-01",
+    projectId: "proj-01",
+    projectName: "Cloud Infrastructure Modernization",
+    name: "V1 Cloud Ingestion Architecture & Kafka Pipeline",
+    dueDate: "2026-09-30",
+    status: "In Progress",
+    weight: "25% Payment Milestone",
+    description: "Cloud data pipeline verification and throughput load test",
+  },
+  {
+    id: "mls-02",
+    projectId: "proj-02",
+    projectName: "Enterprise Cybersecurity Assessment & Zero Trust",
+    name: "SOC2 Type II Audit Compliance Report Acceptance",
+    dueDate: "2026-10-15",
+    status: "Pending Review",
+    weight: "Final Sign-off",
+    description: "Independent security auditor sign-off and risk remediation",
+  },
+  {
+    id: "mls-03",
+    projectId: "proj-03",
+    projectName: "NextGen ERP Engine",
+    name: "Core Platform Modernization Alpha Release",
+    dueDate: "2026-11-20",
+    status: "Planning",
+    weight: "40% Deliverable",
+    description: "Alpha build containerization and client staging release",
+  },
+];
+
+export const initialInvitations: UserInvitation[] = [
+  {
+    id: "inv-01",
+    name: "Siddharth Mehra",
+    email: "siddharth.m@partner.worqester.internal",
+    role: "Project Manager",
+    department: "Engineering",
+    status: "Pending",
+    invitedAt: "2026-09-15",
+  },
+  {
+    id: "inv-02",
+    name: "Ananya Roy",
+    email: "ananya.roy@worqester.internal",
+    role: "Sales Executive",
+    department: "Sales & Revenue",
+    status: "Pending",
+    invitedAt: "2026-09-16",
   },
 ];

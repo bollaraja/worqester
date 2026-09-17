@@ -21,9 +21,13 @@ import {
   ActivityItem,
   AuditLogItem,
   AutomationRule,
+  Milestone,
+  UserInvitation,
+  UserRole,
 } from "../types";
 import { StorageService } from "../services/storage";
 import { AuthService } from "../services/auth";
+import { CrmApi, ProjectsApi, TasksApi, HrmApi, SettingsApi } from "../services/api";
 
 export interface Notification {
   id: string;
@@ -103,6 +107,9 @@ interface AppContextType {
   activities: ActivityItem[];
   auditLogs: AuditLogItem[];
   automations: AutomationRule[];
+  milestones: Milestone[];
+  invitations: UserInvitation[];
+  rbacPermissions: Record<string, boolean[]>;
   favorites: string[];
   toggleFavorite: (id: string) => void;
 
@@ -121,12 +128,26 @@ interface AppContextType {
   updateCompany: (id: string, data: Partial<Company>) => void;
   createContact: (data: Omit<Contact, "id" | "createdAt" | "organizationId">) => void;
   createEmployee: (data: Omit<Employee, "id" | "organizationId">) => void;
+  updateEmployee: (id: string, data: Partial<Employee>) => void;
   createLeaveRequest: (data: Omit<LeaveRequest, "id" | "createdAt">) => void;
   updateLeaveStatus: (id: string, status: "Approved" | "Rejected") => void;
   createExpense: (data: Omit<Expense, "id">) => void;
+  updateExpenseStatus: (id: string, status: "Pending" | "Approved" | "Rejected" | "Reimbursed") => void;
+  createAsset: (data: Omit<Asset, "id">) => void;
+  updateAsset: (id: string, data: Partial<Asset>) => void;
+  deleteAsset: (id: string) => void;
+  createCandidate: (data: Omit<Candidate, "id" | "appliedDate">) => void;
+  updateCandidate: (id: string, data: Partial<Candidate>) => void;
+  deleteCandidate: (id: string) => void;
+  createMilestone: (data: Omit<Milestone, "id">) => void;
+  updateMilestone: (id: string, data: Partial<Milestone>) => void;
+  deleteMilestone: (id: string) => void;
+  inviteUser: (data: { name: string; email: string; role: UserRole; department: string }) => void;
+  revokeInvitation: (id: string) => void;
+  toggleRbacPermission: (capability: string, roleIndex: number) => void;
   createNote: (data: Omit<NoteItem, "id" | "updatedAt">) => void;
   addDocument: (doc: Omit<DocumentItem, "id" | "uploadedAt">) => void;
-  deleteItem: (type: "lead" | "deal" | "project" | "task" | "company" | "employee" | "document" | "note", id: string) => void;
+  deleteItem: (type: string, id: string) => void;
   
   // Attendance actions
   checkInCurrentUser: () => void;
@@ -134,6 +155,7 @@ interface AppContextType {
   
   // Reset
   resetDemoData: () => void;
+  resetToDemoData: () => void;
   refreshData: () => void;
   kpis: ReturnType<typeof StorageService.getDynamicKpis>;
 }
@@ -203,9 +225,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
 
-  // Check auth session on startup
+  const syncFromBackend = async () => {
+    try {
+      const [
+        dealsRes,
+        leadsRes,
+        projectsRes,
+        milestonesRes,
+        tasksRes,
+        employeesRes,
+        expensesRes,
+        assetsRes,
+        candidatesRes,
+        invitationsRes,
+        rbacRes,
+        auditRes,
+      ] = await Promise.allSettled([
+        CrmApi.getDeals(),
+        CrmApi.getLeads(),
+        ProjectsApi.getProjects(),
+        ProjectsApi.getMilestones(),
+        TasksApi.getTasks(),
+        HrmApi.getEmployees(),
+        HrmApi.getExpenses(),
+        HrmApi.getAssets(),
+        HrmApi.getCandidates(),
+        SettingsApi.getInvitations(),
+        SettingsApi.getRbac(),
+        SettingsApi.getAuditLogs(),
+      ]);
+
+      if (dealsRes.status === "fulfilled" && Array.isArray(dealsRes.value)) {
+        setDeals(dealsRes.value);
+        StorageService.saveDeals(dealsRes.value);
+      }
+      if (leadsRes.status === "fulfilled" && Array.isArray(leadsRes.value)) {
+        setLeads(leadsRes.value);
+        StorageService.saveLeads(leadsRes.value);
+      }
+      if (projectsRes.status === "fulfilled" && Array.isArray(projectsRes.value)) {
+        setProjects(projectsRes.value);
+        StorageService.saveProjects(projectsRes.value);
+      }
+      if (milestonesRes.status === "fulfilled" && Array.isArray(milestonesRes.value)) {
+        setMilestones(milestonesRes.value);
+        StorageService.saveMilestones(milestonesRes.value);
+      }
+      if (tasksRes.status === "fulfilled" && Array.isArray(tasksRes.value)) {
+        setTasks(tasksRes.value);
+        StorageService.saveTasks(tasksRes.value);
+      }
+      if (employeesRes.status === "fulfilled" && Array.isArray(employeesRes.value)) {
+        setEmployees(employeesRes.value);
+        StorageService.saveEmployees(employeesRes.value);
+      }
+      if (expensesRes.status === "fulfilled" && Array.isArray(expensesRes.value)) {
+        setExpenses(expensesRes.value);
+        StorageService.saveExpenses(expensesRes.value);
+      }
+      if (assetsRes.status === "fulfilled" && Array.isArray(assetsRes.value)) {
+        setAssets(assetsRes.value);
+        StorageService.saveAssets(assetsRes.value);
+      }
+      if (candidatesRes.status === "fulfilled" && Array.isArray(candidatesRes.value)) {
+        setCandidates(candidatesRes.value);
+        StorageService.saveCandidates(candidatesRes.value);
+      }
+      if (invitationsRes.status === "fulfilled" && Array.isArray(invitationsRes.value)) {
+        setInvitations(invitationsRes.value);
+        StorageService.saveInvitations(invitationsRes.value);
+      }
+      if (rbacRes.status === "fulfilled" && rbacRes.value && typeof rbacRes.value === "object" && Object.keys(rbacRes.value).length > 0) {
+        setRbacPermissions(rbacRes.value);
+        StorageService.saveRbacPermissions(rbacRes.value);
+      }
+      if (auditRes.status === "fulfilled" && Array.isArray(auditRes.value)) {
+        setAuditLogs(auditRes.value);
+        StorageService.saveAuditLogs(auditRes.value);
+      }
+    } catch (e) {
+      console.warn("syncFromBackend warning:", e);
+    }
+  };
+
+  // Check auth session and sync backend data on startup
   useEffect(() => {
-    const verify = async () => {
+    const verifyAndSync = async () => {
       if (AuthService.isAuthenticated()) {
         const verified = await AuthService.verifySession();
         if (verified) {
@@ -213,8 +318,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setIsAuthenticated(true);
         }
       }
+      await syncFromBackend();
     };
-    verify();
+    verifyAndSync();
   }, []);
 
   // Entities state
@@ -237,6 +343,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activities, setActivities] = useState<ActivityItem[]>(StorageService.getActivities());
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(StorageService.getAuditLogs());
   const [automations, setAutomations] = useState<AutomationRule[]>(StorageService.getAutomations());
+  const [milestones, setMilestones] = useState<Milestone[]>(StorageService.getMilestones());
+  const [invitations, setInvitations] = useState<UserInvitation[]>(StorageService.getInvitations());
+  const [rbacPermissions, setRbacPermissions] = useState<Record<string, boolean[]>>(StorageService.getRbacPermissions());
   const [favorites, setFavorites] = useState<string[]>(StorageService.getFavorites());
 
   const refreshData = () => {
@@ -251,12 +360,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeaves(StorageService.getLeaves());
     setExpenses(StorageService.getExpenses());
     setAssets(StorageService.getAssets());
+    setCandidates(StorageService.getCandidates());
+    setMilestones(StorageService.getMilestones());
+    setInvitations(StorageService.getInvitations());
+    setRbacPermissions(StorageService.getRbacPermissions());
     setDocuments(StorageService.getDocuments());
     setNotes(StorageService.getNotes());
     setActivities(StorageService.getActivities());
     setAuditLogs(StorageService.getAuditLogs());
     setFavorites(StorageService.getFavorites());
+    syncFromBackend();
   };
+
 
   const switchUser = (userId: string) => {
     const user = availableUsers.find((u) => u.id === userId);
@@ -318,6 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         details: `User signed in successfully.`,
       });
       refreshData();
+      await syncFromBackend();
       return { success: true };
     }
     return { success: false, error: res.error || "Invalid credentials." };
@@ -353,6 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         details: `New user account created with role ${res.user.role}.`,
       });
       refreshData();
+      await syncFromBackend();
       return { success: true };
     }
     return { success: false, error: res.error || "Failed to create account." };
@@ -406,6 +523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = [newLead, ...leads];
     StorageService.saveLeads(list);
     setLeads(list);
+    CrmApi.createLead(newLead).catch((e) => console.error("API createLead error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -431,6 +549,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = leads.map((l) => (l.id === id ? { ...l, ...data } : l));
     StorageService.saveLeads(list);
     setLeads(list);
+    CrmApi.updateLead(id, data).catch((e) => console.error("API updateLead error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -453,6 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = [newDeal, ...deals];
     StorageService.saveDeals(list);
     setDeals(list);
+    CrmApi.createDeal(newDeal).catch((e) => console.error("API createDeal error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -468,6 +588,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = deals.map((d) => (d.id === id ? { ...d, ...data, updatedAt: new Date().toISOString().split("T")[0] } : d));
     StorageService.saveDeals(list);
     setDeals(list);
+    CrmApi.updateDeal(id, data).catch((e) => console.error("API updateDeal error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -507,6 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = [newProject, ...projects];
     StorageService.saveProjects(list);
     setProjects(list);
+    ProjectsApi.createProject(newProject).catch((e) => console.error("API createProject error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -523,6 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = projects.map((p) => (p.id === id ? { ...p, ...data } : p));
     StorageService.saveProjects(list);
     setProjects(list);
+    ProjectsApi.updateProject(id, data).catch((e) => console.error("API updateProject error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -545,6 +668,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     StorageService.saveTasks(list);
     setTasks(list);
     syncProjectProgress(newTask.projectId, list);
+    TasksApi.createTask(newTask).catch((e) => console.error("API createTask error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -571,6 +695,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (affectedProjectId) {
       syncProjectProgress(affectedProjectId, list);
     }
+    TasksApi.updateTask(id, data).catch((e) => console.error("API updateTask error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -596,6 +721,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     StorageService.saveTasks(list);
     setTasks(list);
     syncProjectProgress(target.projectId, list);
+    TasksApi.updateTask(id, {
+      status: updatedTask.status,
+      actualHours: updatedTask.actualHours,
+    }).catch((e) => console.error("API toggleTaskCompletion error:", e));
     StorageService.addAuditLog({
       userName: currentUser.name,
       userRole: currentUser.role,
@@ -606,6 +735,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     refreshData();
   };
+
 
   const setTaskDueDate = (id: string, dueDate: string) => {
     updateTask(id, { dueDate });
@@ -673,6 +803,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   };
 
+  const updateEmployee = (id: string, data: Partial<Employee>) => {
+    const list = employees.map((e) => (e.id === id ? { ...e, ...data } : e));
+    StorageService.saveEmployees(list);
+    setEmployees(list);
+    HrmApi.updateEmployee(id, data).catch((e) => console.error("API updateEmployee error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Updated Employee",
+      entityType: "Employee",
+      entityName: id,
+      details: `Modified employee profile / compensation.`,
+    });
+    refreshData();
+  };
+
   const createLeaveRequest = (data: Omit<LeaveRequest, "id" | "createdAt">) => {
     const newLeave: LeaveRequest = {
       ...data,
@@ -708,7 +854,192 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const list = [newExp, ...expenses];
     StorageService.saveExpenses(list);
     setExpenses(list);
+    HrmApi.createExpense(newExp).catch((e) => console.error("API createExpense error:", e));
     refreshData();
+  };
+
+  const updateExpenseStatus = (id: string, status: "Pending" | "Approved" | "Rejected" | "Reimbursed") => {
+    const list = expenses.map((e) => (e.id === id ? { ...e, status } : e));
+    StorageService.saveExpenses(list);
+    setExpenses(list);
+    HrmApi.updateExpenseStatus(id, status).catch((e) => console.error("API updateExpenseStatus error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: `${status} Expense`,
+      entityType: "Expense",
+      entityName: id,
+      details: `Expense claim status updated to ${status}.`,
+    });
+    refreshData();
+  };
+
+  const createAsset = (data: Omit<Asset, "id">) => {
+    const newAsset: Asset = {
+      ...data,
+      id: `ast-${Date.now()}`,
+      assetCode: data.assetCode || `AST-${Math.floor(1000 + Math.random() * 9000)}`,
+      allocatedDate: data.allocatedDate || new Date().toISOString().split("T")[0],
+    };
+    const list = [newAsset, ...assets];
+    StorageService.saveAssets(list);
+    setAssets(list);
+    HrmApi.createAsset(newAsset).catch((e) => console.error("API createAsset error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Created Asset",
+      entityType: "Asset",
+      entityName: newAsset.name,
+      details: `Registered hardware asset ${newAsset.name} (${newAsset.serialNumber}).`,
+    });
+    refreshData();
+  };
+
+  const updateAsset = (id: string, data: Partial<Asset>) => {
+    const list = assets.map((a) => (a.id === id ? { ...a, ...data } : a));
+    StorageService.saveAssets(list);
+    setAssets(list);
+    refreshData();
+  };
+
+  const deleteAsset = (id: string) => {
+    const list = assets.filter((a) => a.id !== id);
+    StorageService.saveAssets(list);
+    setAssets(list);
+    HrmApi.deleteAsset(id).catch((e) => console.error("API deleteAsset error:", e));
+    refreshData();
+  };
+
+  const createCandidate = (data: Omit<Candidate, "id" | "appliedDate">) => {
+    const newCand: Candidate = {
+      ...data,
+      id: `cand-${Date.now()}`,
+      appliedDate: new Date().toISOString().split("T")[0],
+    };
+    const list = [newCand, ...candidates];
+    StorageService.saveCandidates(list);
+    setCandidates(list);
+    HrmApi.createCandidate(newCand).catch((e) => console.error("API createCandidate error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Added Candidate",
+      entityType: "Candidate",
+      entityName: newCand.name,
+      details: `Candidate registered for ${newCand.positionTitle}.`,
+    });
+    refreshData();
+  };
+
+  const updateCandidate = (id: string, data: Partial<Candidate>) => {
+    const list = candidates.map((c) => (c.id === id ? { ...c, ...data } : c));
+    StorageService.saveCandidates(list);
+    setCandidates(list);
+    if (data.stage) {
+      HrmApi.updateCandidateStage(id, data.stage).catch((e) => console.error("API updateCandidateStage error:", e));
+    }
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Updated Candidate",
+      entityType: "Candidate",
+      entityName: id,
+      details: `Candidate stage or score updated.`,
+    });
+    refreshData();
+  };
+
+  const deleteCandidate = (id: string) => {
+    const list = candidates.filter((c) => c.id !== id);
+    StorageService.saveCandidates(list);
+    setCandidates(list);
+    HrmApi.deleteCandidate(id).catch((e) => console.error("API deleteCandidate error:", e));
+    refreshData();
+  };
+
+  const createMilestone = (data: Omit<Milestone, "id">) => {
+    const newMilestone: Milestone = {
+      ...data,
+      id: `mls-${Date.now()}`,
+    };
+    const list = [...milestones, newMilestone];
+    StorageService.saveMilestones(list);
+    setMilestones(list);
+    ProjectsApi.createMilestone(newMilestone).catch((e) => console.error("API createMilestone error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Created Milestone",
+      entityType: "Milestone",
+      entityName: newMilestone.name,
+      details: `Milestone created for project ${newMilestone.projectName || newMilestone.projectId}.`,
+    });
+    refreshData();
+  };
+
+  const updateMilestone = (id: string, data: Partial<Milestone>) => {
+    const list = milestones.map((m) => (m.id === id ? { ...m, ...data } : m));
+    StorageService.saveMilestones(list);
+    setMilestones(list);
+    ProjectsApi.updateMilestone(id, data).catch((e) => console.error("API updateMilestone error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Updated Milestone",
+      entityType: "Milestone",
+      entityName: id,
+      details: `Milestone status or details modified.`,
+    });
+    refreshData();
+  };
+
+  const deleteMilestone = (id: string) => {
+    const list = milestones.filter((m) => m.id !== id);
+    StorageService.saveMilestones(list);
+    setMilestones(list);
+    ProjectsApi.deleteMilestone(id).catch((e) => console.error("API deleteMilestone error:", e));
+    refreshData();
+  };
+
+  const inviteUser = (data: { name: string; email: string; role: UserRole; department: string }) => {
+    const newInv: UserInvitation = {
+      ...data,
+      id: `inv-${Date.now()}`,
+      status: "Pending",
+      invitedAt: new Date().toISOString().split("T")[0],
+    };
+    const list = [newInv, ...invitations];
+    StorageService.saveInvitations(list);
+    setInvitations(list);
+    SettingsApi.createInvitation(newInv).catch((e) => console.error("API createInvitation error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Invited User",
+      entityType: "UserInvitation",
+      entityName: newInv.email,
+      details: `Sent invitation to ${newInv.name} (${newInv.role}, ${newInv.department}).`,
+    });
+    refreshData();
+  };
+
+  const revokeInvitation = (id: string) => {
+    const list = invitations.filter((inv) => inv.id !== id);
+    StorageService.saveInvitations(list);
+    setInvitations(list);
+    SettingsApi.deleteInvitation(id).catch((e) => console.error("API deleteInvitation error:", e));
+    refreshData();
+  };
+
+  const toggleRbacPermission = (capability: string, roleIndex: number) => {
+    const current = rbacPermissions[capability] || [false, false, false, false];
+    const updated = [...current];
+    updated[roleIndex] = !updated[roleIndex];
+    const newMatrix = { ...rbacPermissions, [capability]: updated };
+    StorageService.saveRbacPermissions(newMatrix);
+    setRbacPermissions(newMatrix);
+    SettingsApi.updateRbac(capability, updated).catch((e) => console.error("API updateRbac error:", e));
   };
 
   const createNote = (data: Omit<NoteItem, "id" | "updatedAt">) => {
@@ -740,18 +1071,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const filtered = leads.filter((l) => l.id !== id);
       StorageService.saveLeads(filtered);
       setLeads(filtered);
+      CrmApi.deleteLead(id).catch((e) => console.error("API deleteLead error:", e));
     } else if (type === "deal") {
       const filtered = deals.filter((d) => d.id !== id);
       StorageService.saveDeals(filtered);
       setDeals(filtered);
+      CrmApi.deleteDeal(id).catch((e) => console.error("API deleteDeal error:", e));
     } else if (type === "project") {
       const filtered = projects.filter((p) => p.id !== id);
       StorageService.saveProjects(filtered);
       setProjects(filtered);
+      ProjectsApi.deleteProject(id).catch((e) => console.error("API deleteProject error:", e));
     } else if (type === "task") {
       const filtered = tasks.filter((t) => t.id !== id);
       StorageService.saveTasks(filtered);
       setTasks(filtered);
+      TasksApi.deleteTask(id).catch((e) => console.error("API deleteTask error:", e));
     } else if (type === "company") {
       const filtered = companies.filter((c) => c.id !== id);
       StorageService.saveCompanies(filtered);
@@ -768,6 +1103,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const filtered = notes.filter((n) => n.id !== id);
       StorageService.saveNotes(filtered);
       setNotes(filtered);
+    } else if (type === "asset") {
+      deleteAsset(id);
+    } else if (type === "candidate") {
+      deleteCandidate(id);
+    } else if (type === "milestone") {
+      deleteMilestone(id);
+    } else if (type === "expense") {
+      const filtered = expenses.filter((e) => e.id !== id);
+      StorageService.saveExpenses(filtered);
+      setExpenses(filtered);
     }
     StorageService.addAuditLog({
       userName: currentUser.name,
@@ -779,6 +1124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     refreshData();
   };
+
 
   const checkInCurrentUser = () => {
     const record: AttendanceRecord = {
@@ -828,6 +1174,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotes(StorageService.getNotes());
     setActivities(StorageService.getActivities());
     setAuditLogs(StorageService.getAuditLogs());
+    setMilestones(StorageService.getMilestones());
+    setInvitations(StorageService.getInvitations());
+    setCandidates(StorageService.getCandidates());
+    setRbacPermissions(StorageService.getRbacPermissions());
     setSettings(StorageService.getSettings());
     setFavorites(StorageService.getFavorites());
   };
@@ -896,6 +1246,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         candidates,
         expenses,
         assets,
+        milestones,
+        invitations,
+        rbacPermissions,
         documents,
         notes,
         activities,
@@ -917,15 +1270,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCompany,
         createContact,
         createEmployee,
+        updateEmployee,
         createLeaveRequest,
         updateLeaveStatus,
         createExpense,
+        updateExpenseStatus,
+        createAsset,
+        updateAsset,
+        deleteAsset,
+        createCandidate,
+        updateCandidate,
+        deleteCandidate,
+        createMilestone,
+        updateMilestone,
+        deleteMilestone,
+        inviteUser,
+        revokeInvitation,
+        toggleRbacPermission,
         createNote,
         addDocument,
         deleteItem,
         checkInCurrentUser,
         checkOutCurrentUser,
         resetDemoData,
+        resetToDemoData: resetDemoData,
         refreshData,
         kpis,
       }}

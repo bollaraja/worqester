@@ -20,8 +20,13 @@ import {
   Check,
   Download,
   Trash2,
+  Pencil,
+  ArrowRight,
+  Star,
 } from "lucide-react";
 import { Employee, AttendanceRecord, LeaveRequest, JobPosition, Candidate, Expense, Asset } from "../types";
+import { EditEmployeeModal, AddAssetModal, AddCandidateModal } from "../components/modals/EditModals";
+import { generatePayslipPDF } from "../utils/payslipGenerator";
 
 export const HrmView: React.FC = () => {
   const {
@@ -37,6 +42,13 @@ export const HrmView: React.FC = () => {
     expenses,
     assets,
     updateLeaveStatus,
+    updateExpenseStatus,
+    updateEmployee,
+    createAsset,
+    deleteAsset,
+    createCandidate,
+    updateCandidate,
+    deleteCandidate,
     checkInCurrentUser,
     checkOutCurrentUser,
     currentUser,
@@ -44,6 +56,10 @@ export const HrmView: React.FC = () => {
     kpis,
     deleteItem,
   } = useApp();
+
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
+  const [isAddCandidateOpen, setIsAddCandidateOpen] = useState(false);
 
   const activeSubView = currentSubView || "dashboard";
   const [filterDept, setFilterDept] = useState("all");
@@ -125,14 +141,24 @@ export const HrmView: React.FC = () => {
       key: "actions",
       header: "Actions",
       render: (emp) => (
-        <button
-          type="button"
-          onClick={() => deleteItem("employee", emp.id)}
-          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-          title="Delete Employee"
-        >
-          <Trash2 size={13} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditingEmployee(emp)}
+            className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Edit Employee Profile"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => deleteItem("employee", emp.id)}
+            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Delete Employee"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -505,11 +531,36 @@ export const HrmView: React.FC = () => {
               <h3 className="text-sm font-bold text-white">Active Open Positions ({positions.length})</h3>
               <p className="text-xs text-slate-400">Job requisitions and candidate pipeline</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsAddCandidateOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus size={14} />
+              <span>Add Candidate</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {positions.map((pos) => {
-              const posCandidates = candidates.filter((c) => c.jobPositionId === pos.id);
+              const posCandidates = candidates.filter(
+                (c: any) => c.positionId === pos.id || c.jobPositionId === pos.id
+              );
+
+              const nextStages: Record<string, Candidate["stage"]> = {
+                Applied: "Screening",
+                Screening: "Interview",
+                Interview: "Technical",
+                Technical: "Managerial",
+                Managerial: "Offer",
+                Offer: "Joined",
+              };
+
+              const salaryDisplay =
+                typeof pos.salaryRange === "string"
+                  ? pos.salaryRange
+                  : "₹15,00,000 - ₹25,00,000";
+
               return (
                 <div
                   key={pos.id}
@@ -527,33 +578,62 @@ export const HrmView: React.FC = () => {
 
                   <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 font-mono text-slate-300 flex items-center justify-between">
                     <span>Budgeted CTC:</span>
-                    <strong className="text-emerald-400">
-                      {formatCurrency(pos.salaryRange.min)} - {formatCurrency(pos.salaryRange.max)}
-                    </strong>
+                    <strong className="text-emerald-400">{salaryDisplay}</strong>
                   </div>
 
                   <div className="space-y-2">
-                    <span className="font-semibold text-slate-400 text-[10px] uppercase">
-                      Candidates in Pipeline ({posCandidates.length})
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-400 text-[10px] uppercase">
+                        Candidates in Pipeline ({posCandidates.length})
+                      </span>
+                    </div>
+
                     <div className="space-y-1.5">
-                      {posCandidates.map((cand) => (
-                        <div
-                          key={cand.id}
-                          className="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/50 flex items-center justify-between"
-                        >
-                          <div>
-                            <div className="font-bold text-white">{cand.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{cand.email}</div>
+                      {posCandidates.length === 0 ? (
+                        <div className="text-slate-500 text-[11px] py-2">No active candidates in pipeline.</div>
+                      ) : (
+                        posCandidates.map((cand) => (
+                          <div
+                            key={cand.id}
+                            className="p-2.5 rounded-lg bg-slate-950/40 border border-slate-800/50 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-bold text-white truncate">{cand.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono truncate">
+                                {cand.email} • {cand.experienceYears}y exp
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-mono text-amber-400 font-bold flex items-center gap-0.5">
+                                <Star size={11} className="fill-amber-400 text-amber-400" />
+                                <span>{cand.rating}</span>
+                              </span>
+                              <StatusBadge status={cand.stage} size="sm" />
+                              {nextStages[cand.stage] && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateCandidate(cand.id, { stage: nextStages[cand.stage] })
+                                  }
+                                  className="px-2 py-0.5 rounded bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white border border-blue-500/30 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                                  title={`Advance to ${nextStages[cand.stage]}`}
+                                >
+                                  <span>Advance</span>
+                                  <ArrowRight size={10} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteCandidate(cand.id)}
+                                className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                title="Remove candidate"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-amber-400 font-bold">
-                              {cand.rating}★
-                            </span>
-                            <StatusBadge status={cand.stage} size="sm" />
-                          </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -604,7 +684,7 @@ export const HrmView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openCreateModal("leave")}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Calendar size={14} />
                 <span>Apply for Leave</span>
@@ -612,18 +692,32 @@ export const HrmView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => openCreateModal("expense")}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/60"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/60 cursor-pointer"
               >
                 <DollarSign size={14} />
                 <span>Claim Reimbursement</span>
               </button>
               <button
                 type="button"
-                onClick={() => alert("Payslip for August 2026 generated and downloaded.")}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700/60"
+                onClick={() => {
+                  const currentEmp =
+                    employees.find((e) => e.email === currentUser.email) ||
+                    employees[0] || {
+                      fullName: currentUser.name,
+                      employeeNumber: "WQ-1001",
+                      designation: currentUser.jobTitle || currentUser.role,
+                      department: currentUser.department,
+                      salaryBasic: 125000,
+                      bankAccountMasked: "HDFC **** 8841",
+                      workMode: "On-site" as const,
+                      location: "Bengaluru",
+                    };
+                  generatePayslipPDF(currentEmp as Employee, "August 2026");
+                }}
+                className="px-4 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 border border-blue-500/30 transition-all cursor-pointer"
               >
                 <Download size={14} />
-                <span>Download August Payslip</span>
+                <span>Download Official August Payslip (PDF)</span>
               </button>
             </div>
           </div>
@@ -641,7 +735,7 @@ export const HrmView: React.FC = () => {
             <button
               type="button"
               onClick={() => openCreateModal("expense")}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer"
             >
               + Submit Claim
             </button>
@@ -651,7 +745,7 @@ export const HrmView: React.FC = () => {
             {expenses.map((exp) => (
               <div
                 key={exp.id}
-                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2"
+                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2.5"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white">{exp.employeeName}</span>
@@ -662,6 +756,26 @@ export const HrmView: React.FC = () => {
                   <span className="text-slate-500">{exp.category} • {exp.date}</span>
                   <strong className="text-emerald-400 text-sm">{formatCurrency(exp.amount)}</strong>
                 </div>
+
+                {exp.status === "Pending" && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-800/40">
+                    <button
+                      type="button"
+                      onClick={() => updateExpenseStatus(exp.id, "Approved")}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <Check size={11} />
+                      <span>Approve</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateExpenseStatus(exp.id, "Rejected")}
+                      className="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-[10px] font-semibold transition-colors cursor-pointer"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -676,29 +790,92 @@ export const HrmView: React.FC = () => {
               <h3 className="text-sm font-bold text-white">Company IT & Hardware Assets</h3>
               <p className="text-xs text-slate-400">Laptops, monitors, security keys assigned to workforce</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsAddAssetOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Plus size={14} />
+              <span>Register Asset</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {assets.map((ast) => (
               <div
                 key={ast.id}
-                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2"
+                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2 shadow-sm"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-blue-400">{ast.assetCode}</span>
-                  <StatusBadge status={ast.status} size="sm" />
+                  <span className="font-mono font-bold text-blue-400">
+                    {ast.assetCode || `AST-${ast.id.slice(-4)}`}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge status={ast.status} size="sm" />
+                    <button
+                      type="button"
+                      onClick={() => deleteAsset(ast.id)}
+                      className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Delete asset"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
                 <h4 className="font-bold text-white">{ast.name}</h4>
                 <div className="text-slate-400 text-[11px] font-mono">
-                  Assigned to: <span className="text-slate-200 font-semibold">{ast.assignedToName}</span>
+                  Assigned to:{" "}
+                  <span className="text-slate-200 font-semibold">
+                    {ast.assignedToName || ast.employeeName || "Unassigned"}
+                  </span>
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono pt-1">
-                  Serial: {ast.serialNumber} • Allocated {ast.allocatedDate}
+                <div className="text-[10px] text-slate-500 font-mono pt-1 flex items-center justify-between">
+                  <span>Serial: {ast.serialNumber}</span>
+                  <span className="text-slate-400">Cond: {ast.condition}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+
+      {/* Edit Employee Modal */}
+      {editingEmployee && (
+        <EditEmployeeModal
+          employee={editingEmployee}
+          isOpen={true}
+          onClose={() => setEditingEmployee(null)}
+          onSave={(updated) => {
+            updateEmployee(editingEmployee.id, updated);
+            setEditingEmployee(null);
+          }}
+        />
+      )}
+
+      {/* Add Asset Modal */}
+      {isAddAssetOpen && (
+        <AddAssetModal
+          employees={employees}
+          isOpen={true}
+          onClose={() => setIsAddAssetOpen(false)}
+          onSave={(data) => {
+            createAsset(data);
+            setIsAddAssetOpen(false);
+          }}
+        />
+      )}
+
+      {/* Add Candidate Modal */}
+      {isAddCandidateOpen && (
+        <AddCandidateModal
+          positions={positions}
+          isOpen={true}
+          onClose={() => setIsAddCandidateOpen(false)}
+          onSave={(data) => {
+            createCandidate(data);
+            setIsAddCandidateOpen(false);
+          }}
+        />
       )}
     </div>
   );

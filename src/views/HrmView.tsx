@@ -63,7 +63,8 @@ export const HrmView: React.FC = () => {
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
   const [isAddCandidateOpen, setIsAddCandidateOpen] = useState(false);
 
-  const activeSubView = currentSubView || "dashboard";
+  const isEmployee = currentUser.role === "Employee";
+  const activeSubView = currentSubView || (isEmployee ? "self-service" : "dashboard");
   const [filterDept, setFilterDept] = useState("all");
 
   const filteredEmployees = employees.filter((e) => {
@@ -221,17 +222,28 @@ export const HrmView: React.FC = () => {
       {/* Sub Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-2 overflow-x-auto scrollbar-none text-xs">
-          {[
-            { id: "dashboard", label: "HR Dashboard", count: null },
-            { id: "employees", label: "Employees Directory", count: employees.length },
-            { id: "departments", label: "Departments & Org Chart", count: departments.length },
-            { id: "attendance", label: "Attendance Log", count: attendance.length },
-            { id: "leave", label: "Leave Requests", count: kpis.pendingLeaves },
-            { id: "recruitment", label: "Recruitment (ATS)", count: kpis.openPositionsCount },
-            { id: "self-service", label: "Employee Self-Service", count: null },
-            { id: "expenses", label: "Expenses Claims", count: expenses.length },
-            { id: "assets", label: "Asset Allocation", count: assets.length },
-          ].map((tab) => (
+          {(isEmployee
+            ? [
+                { id: "self-service", label: "My Self-Service Portal", count: null },
+                { id: "attendance", label: "My Attendance Log", count: null },
+                { id: "leave", label: "My Leave Requests", count: leaves.filter((l) => l.employeeName === currentUser.name || l.employeeId === currentUser.id).length },
+                { id: "expenses", label: "My Expense Claims", count: expenses.filter((e) => e.employeeName === currentUser.name).length },
+                { id: "employees", label: "Company Directory", count: employees.length },
+                { id: "departments", label: "Departments & Org Chart", count: departments.length },
+                { id: "assets", label: "My Allocated Assets", count: assets.filter((a) => a.assignedToName === currentUser.name).length },
+              ]
+            : [
+                { id: "dashboard", label: "HR Dashboard", count: null },
+                { id: "employees", label: "Employees Directory", count: employees.length },
+                { id: "departments", label: "Departments & Org Chart", count: departments.length },
+                { id: "attendance", label: "Attendance Log", count: attendance.length },
+                { id: "leave", label: "Leave Requests", count: kpis.pendingLeaves },
+                { id: "recruitment", label: "Recruitment (ATS)", count: kpis.openPositionsCount },
+                { id: "self-service", label: "Employee Self-Service", count: null },
+                { id: "expenses", label: "Expenses Claims", count: expenses.length },
+                { id: "assets", label: "Asset Allocation", count: assets.length },
+              ]
+          ).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -723,6 +735,105 @@ export const HrmView: React.FC = () => {
                 <span>Download Official August Payslip (PDF)</span>
               </button>
             </div>
+          </div>
+
+          {/* Today's Live Attendance & Clock In / Out */}
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-emerald-400" />
+                <h4 className="text-sm font-bold text-white">Daily Attendance & Work Mode</h4>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Standard shift: 09:30 AM – 06:30 PM IST • Bangalore Development Centre
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {attendance.some((a) => (a.employeeName === currentUser.name || a.employeeId === currentUser.id) && a.status === "Present") ? (
+                <div className="px-3 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 size={14} />
+                  <span>Clocked In Today (09:15 AM)</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={checkInCurrentUser}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Clock size={14} />
+                  <span>Clock In Now</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* My Leave Requests & History */}
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-white">My Submitted Leave Applications</h4>
+              <button
+                type="button"
+                onClick={() => openCreateModal("leave")}
+                className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+              >
+                + New Application
+              </button>
+            </div>
+
+            {leaves.filter((l) => l.employeeName === currentUser.name || l.employeeId === currentUser.id).length === 0 ? (
+              <p className="text-xs text-slate-400 py-3 text-center">No leave applications recorded for this cycle.</p>
+            ) : (
+              <div className="space-y-2">
+                {leaves
+                  .filter((l) => l.employeeName === currentUser.name || l.employeeId === currentUser.id)
+                  .map((lv) => (
+                    <div
+                      key={lv.id}
+                      className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-semibold text-white">{lv.type} Leave ({lv.days} Days)</span>
+                        <div className="text-[11px] text-slate-400 mt-0.5">{lv.reason}</div>
+                        <div className="text-[10px] font-mono text-slate-500">{lv.startDate} to {lv.endDate}</div>
+                      </div>
+                      <StatusBadge status={lv.status} size="sm" />
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* My Allocated Hardware & Software Assets */}
+          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 space-y-3">
+            <h4 className="text-sm font-bold text-white">My Assigned Hardware & Software Assets</h4>
+            {assets.filter((a) => a.assignedToName === currentUser.name).length === 0 ? (
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center justify-between text-xs">
+                <div>
+                  <span className="font-semibold text-white">Apple MacBook Pro 16" M3 Max</span>
+                  <div className="text-[11px] text-slate-400">IT Serial: WQ-AST-9021 • Warranty Active</div>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Allocated
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {assets
+                  .filter((a) => a.assignedToName === currentUser.name)
+                  .map((ast) => (
+                    <div
+                      key={ast.id}
+                      className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-semibold text-white">{ast.name}</span>
+                        <div className="text-[11px] text-slate-400 font-mono">{ast.model || ast.category} • S/N: {ast.serialNumber}</div>
+                      </div>
+                      <StatusBadge status={ast.status} size="sm" />
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         </div>
       )}

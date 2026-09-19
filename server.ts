@@ -736,14 +736,21 @@ app.get("/api/tasks", requireAuth, async (req: any, res) => {
     const tasks = await db.query(
       `SELECT t.id, t.project_id as "projectId", COALESCE(p.name, 'General Project') as "projectName",
               t.title, t.description, t.assignee_id as "assigneeId", COALESCE(u.name, 'Unassigned') as "assigneeName",
-              t.priority, t.status, t.due_date as "dueDate", t.estimated_hours as "estimatedHours", t.actual_hours as "actualHours"
+              u.avatar as "assigneeAvatar",
+              t.priority, t.status, t.due_date as "dueDate", t.estimated_hours as "estimatedHours", t.actual_hours as "actualHours",
+              t.comments, t.notes
        FROM tasks t
        LEFT JOIN projects p ON t.project_id = p.id
        LEFT JOIN users u ON t.assignee_id = u.id
        WHERE t.workspace_id = ? ORDER BY t.created_at DESC`,
       [req.workspaceId]
     );
-    return res.json({ success: true, tasks });
+    const parsedTasks = tasks.map((t: any) => ({
+      ...t,
+      comments: typeof t.comments === "string" ? (() => { try { return JSON.parse(t.comments); } catch { return []; } })() : (t.comments || []),
+      notes: t.notes || "",
+    }));
+    return res.json({ success: true, tasks: parsedTasks });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -755,12 +762,13 @@ app.post("/api/tasks", requireAuth, async (req: any, res) => {
     const t = req.body;
     const id = t.id || `tsk-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
+    const commentsJson = t.comments ? (typeof t.comments === "string" ? t.comments : JSON.stringify(t.comments)) : "[]";
     await db.execute(
-      `INSERT INTO tasks (id, workspace_id, project_id, title, description, assignee_id, priority, status, due_date, estimated_hours, actual_hours, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.workspaceId, t.projectId, t.title, t.description || "", t.assigneeId || req.user.id, t.priority || "Medium", t.status || "To Do", t.dueDate, t.estimatedHours || 0, t.actualHours || 0, now, now]
+      `INSERT INTO tasks (id, workspace_id, project_id, title, description, assignee_id, priority, status, due_date, estimated_hours, actual_hours, comments, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.workspaceId, t.projectId, t.title, t.description || "", t.assigneeId || req.user.id, t.priority || "Medium", t.status || "To Do", t.dueDate, t.estimatedHours || 0, t.actualHours || 0, commentsJson, t.notes || "", now, now]
     );
-    return res.status(201).json({ success: true, task: { ...t, id } });
+    return res.status(201).json({ success: true, task: { ...t, id, comments: Array.isArray(t.comments) ? t.comments : [], notes: t.notes || "" } });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
@@ -771,13 +779,55 @@ app.put("/api/tasks/:id", requireAuth, async (req: any, res) => {
     const db = await getDatabase();
     const t = req.body;
     const now = new Date().toISOString();
+    const commentsJson = t.comments !== undefined ? (typeof t.comments === "string" ? t.comments : JSON.stringify(t.comments)) : null;
     await db.execute(
-      `UPDATE tasks SET title = ?, description = ?, priority = ?, status = ?, due_date = ?,
-              estimated_hours = ?, actual_hours = ?, updated_at = ?
+      `UPDATE tasks SET title = COALESCE(?, title), description = COALESCE(?, description),
+              project_id = COALESCE(?, project_id), assignee_id = COALESCE(?, assignee_id),
+              priority = COALESCE(?, priority), status = COALESCE(?, status), due_date = COALESCE(?, due_date),
+              estimated_hours = COALESCE(?, estimated_hours), actual_hours = COALESCE(?, actual_hours),
+              comments = COALESCE(?, comments), notes = COALESCE(?, notes), updated_at = ?
        WHERE id = ? AND workspace_id = ?`,
-      [t.title, t.description, t.priority, t.status, t.dueDate, t.estimatedHours, t.actualHours, now, req.params.id, req.workspaceId]
+      [t.title, t.description, t.projectId, t.assigneeId, t.priority, t.status, t.dueDate, t.estimatedHours, t.actualHours, commentsJson, t.notes, now, req.params.id, req.workspaceId]
     );
     return res.json({ success: true, task: { ...t, id: req.params.id } });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/tasks/:id/comments", requireAuth, async (req: any, res) => {
+  try {
+    const db = await getDatabase();
+    const { content, text, comment } = req.body;
+    const commentText = (content || text || comment || "").trim();
+    if (!commentText) {
+      return res.status(400).json({ success: false, error: "Comment content cannot be empty." });
+    }
+    const current = await db.query("SELECT * FROM tasks WHERE id = ? AND workspace_id = ?", [req.params.id, req.workspaceId]);
+    if (!current || current.length === 0) {
+      return res.status(404).json({ success: false, error: "Task not found." });
+    }
+    const existingComments = typeof current[0].comments === "string"
+      ? (() => { try { return JSON.parse(current[0].comments); } catch { return []; } })()
+      : (current[0].comments || []);
+
+    const newComment = {
+      id: `cm-${Date.now().toString(36)}`,
+      taskId: req.params.id,
+      authorId: req.user.id,
+      authorName: req.user.name,
+      authorAvatar: req.user.avatar || "",
+      content: commentText,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [...existingComments, newComment];
+    await db.execute("UPDATE tasks SET comments = ?, updated_at = ? WHERE id = ? AND workspace_id = ?", [
+      JSON.stringify(updated),
+      new Date().toISOString(),
+      req.params.id,
+      req.workspaceId
+    ]);
+    return res.json({ success: true, comment: newComment, comments: updated });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }

@@ -358,60 +358,104 @@ export const Sidebar: React.FC = () => {
             active={currentView === "hrm"}
             expanded={expandedSections.hrm}
             onToggle={() => {
-              if (sidebarCollapsed) navigateTo("hrm", "dashboard");
+              const defaultSub = currentUser.role === "Employee" ? "self-service" : "dashboard";
+              if (sidebarCollapsed) navigateTo("hrm", defaultSub);
               else toggleSection("hrm");
             }}
             collapsed={sidebarCollapsed}
             badge={kpis.totalEmployees}
           >
-            <SubNavItem
-              title="HR Dashboard"
-              active={currentView === "hrm" && currentSubView === "dashboard"}
-              onClick={() => navigateTo("hrm", "dashboard")}
-            />
-            <SubNavItem
-              title="Employees Directory"
-              active={currentView === "hrm" && currentSubView === "employees"}
-              onClick={() => navigateTo("hrm", "employees")}
-            />
-            <SubNavItem
-              title="Departments & Org Chart"
-              active={currentView === "hrm" && currentSubView === "departments"}
-              onClick={() => navigateTo("hrm", "departments")}
-            />
-            <SubNavItem
-              title="Attendance"
-              active={currentView === "hrm" && currentSubView === "attendance"}
-              onClick={() => navigateTo("hrm", "attendance")}
-              badge={`${kpis.attendanceToday} In`}
-            />
-            <SubNavItem
-              title="Leave Management"
-              active={currentView === "hrm" && currentSubView === "leave"}
-              onClick={() => navigateTo("hrm", "leave")}
-              badge={kpis.pendingLeaves > 0 ? kpis.pendingLeaves : undefined}
-            />
-            <SubNavItem
-              title="Recruitment / ATS"
-              active={currentView === "hrm" && currentSubView === "recruitment"}
-              onClick={() => navigateTo("hrm", "recruitment")}
-              badge={kpis.openPositionsCount}
-            />
-            <SubNavItem
-              title="Employee Self Service"
-              active={currentView === "hrm" && currentSubView === "self-service"}
-              onClick={() => navigateTo("hrm", "self-service")}
-            />
-            <SubNavItem
-              title="Expenses"
-              active={currentView === "hrm" && currentSubView === "expenses"}
-              onClick={() => navigateTo("hrm", "expenses")}
-            />
-            <SubNavItem
-              title="Assets"
-              active={currentView === "hrm" && currentSubView === "assets"}
-              onClick={() => navigateTo("hrm", "assets")}
-            />
+            {currentUser.role === "Employee" ? (
+              <>
+                <SubNavItem
+                  title="My Self Service Portal"
+                  active={currentView === "hrm" && currentSubView === "self-service"}
+                  onClick={() => navigateTo("hrm", "self-service")}
+                />
+                <SubNavItem
+                  title="My Attendance"
+                  active={currentView === "hrm" && currentSubView === "attendance"}
+                  onClick={() => navigateTo("hrm", "attendance")}
+                  badge={`${kpis.attendanceToday} In`}
+                />
+                <SubNavItem
+                  title="My Leaves"
+                  active={currentView === "hrm" && currentSubView === "leave"}
+                  onClick={() => navigateTo("hrm", "leave")}
+                />
+                <SubNavItem
+                  title="My Expenses & Claims"
+                  active={currentView === "hrm" && currentSubView === "expenses"}
+                  onClick={() => navigateTo("hrm", "expenses")}
+                />
+                <SubNavItem
+                  title="Company Directory"
+                  active={currentView === "hrm" && currentSubView === "employees"}
+                  onClick={() => navigateTo("hrm", "employees")}
+                />
+                <SubNavItem
+                  title="Departments & Org Chart"
+                  active={currentView === "hrm" && currentSubView === "departments"}
+                  onClick={() => navigateTo("hrm", "departments")}
+                />
+                <SubNavItem
+                  title="My Allocated Assets"
+                  active={currentView === "hrm" && currentSubView === "assets"}
+                  onClick={() => navigateTo("hrm", "assets")}
+                />
+              </>
+            ) : (
+              <>
+                <SubNavItem
+                  title="HR Dashboard"
+                  active={currentView === "hrm" && currentSubView === "dashboard"}
+                  onClick={() => navigateTo("hrm", "dashboard")}
+                />
+                <SubNavItem
+                  title="Employees Directory"
+                  active={currentView === "hrm" && currentSubView === "employees"}
+                  onClick={() => navigateTo("hrm", "employees")}
+                />
+                <SubNavItem
+                  title="Departments & Org Chart"
+                  active={currentView === "hrm" && currentSubView === "departments"}
+                  onClick={() => navigateTo("hrm", "departments")}
+                />
+                <SubNavItem
+                  title="Attendance"
+                  active={currentView === "hrm" && currentSubView === "attendance"}
+                  onClick={() => navigateTo("hrm", "attendance")}
+                  badge={`${kpis.attendanceToday} In`}
+                />
+                <SubNavItem
+                  title="Leave Management"
+                  active={currentView === "hrm" && currentSubView === "leave"}
+                  onClick={() => navigateTo("hrm", "leave")}
+                  badge={kpis.pendingLeaves > 0 ? kpis.pendingLeaves : undefined}
+                />
+                <SubNavItem
+                  title="Recruitment / ATS"
+                  active={currentView === "hrm" && currentSubView === "recruitment"}
+                  onClick={() => navigateTo("hrm", "recruitment")}
+                  badge={kpis.openPositionsCount}
+                />
+                <SubNavItem
+                  title="Employee Self Service"
+                  active={currentView === "hrm" && currentSubView === "self-service"}
+                  onClick={() => navigateTo("hrm", "self-service")}
+                />
+                <SubNavItem
+                  title="Expenses"
+                  active={currentView === "hrm" && currentSubView === "expenses"}
+                  onClick={() => navigateTo("hrm", "expenses")}
+                />
+                <SubNavItem
+                  title="Assets"
+                  active={currentView === "hrm" && currentSubView === "assets"}
+                  onClick={() => navigateTo("hrm", "assets")}
+                />
+              </>
+            )}
           </NavGroup>
         )}
 

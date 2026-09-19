@@ -5,6 +5,7 @@ import {
   Project,
   Milestone,
   Task,
+  TaskComment,
   Employee,
   Expense,
   Asset,
@@ -179,6 +180,14 @@ export const TasksApi = {
       body: JSON.stringify(task),
     });
     return res && res.success ? res.task : null;
+  },
+
+  addTaskComment: async (taskId: string, content: string): Promise<TaskComment | null> => {
+    const res = await apiRequest<{ success: boolean; comment: TaskComment }>(`/api/tasks/${taskId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
+    return res && res.success ? res.comment : null;
   },
 
   deleteTask: async (id: string): Promise<boolean> => {

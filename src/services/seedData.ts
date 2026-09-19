@@ -885,6 +885,27 @@ export const initialTasks: Task[] = [
     estimatedHours: 24,
     actualHours: 28,
     slaBreached: true,
+    notes: "Requires coordination with Security Ops to verify session invalidation tests across distributed nodes.",
+    comments: [
+      {
+        id: "cm-01",
+        taskId: "task-101",
+        authorId: "usr-04",
+        authorName: "Elena Rostova",
+        authorAvatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
+        content: "Please ensure this satisfies the ISO-27001 audit controls before Thursday's compliance sync.",
+        createdAt: "2026-09-01T10:30:00Z"
+      },
+      {
+        id: "cm-02",
+        taskId: "task-101",
+        authorId: "usr-05",
+        authorName: "Vikram Patel",
+        authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+        content: "Implemented token revocation blocklist in Redis. Running cluster validation tests today.",
+        createdAt: "2026-09-02T14:15:00Z"
+      }
+    ],
     createdAt: "2026-08-20",
   },
   {
@@ -906,6 +927,18 @@ export const initialTasks: Task[] = [
     dueDate: "2026-09-07",
     estimatedHours: 16,
     actualHours: 10,
+    notes: "Auto-scaler minimum pool set to 2 replicas, peak burst capacity set to 6 replicas.",
+    comments: [
+      {
+        id: "cm-03",
+        taskId: "task-102",
+        authorId: "usr-05",
+        authorName: "Vikram Patel",
+        authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+        content: "Replica scale-out latency reduced to under 90 seconds in preliminary staging benchmarks.",
+        createdAt: "2026-09-05T11:00:00Z"
+      }
+    ],
     createdAt: "2026-08-26",
   },
   {

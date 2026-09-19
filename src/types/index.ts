@@ -159,6 +159,16 @@ export interface Project {
 
 export type TaskStatus = "Backlog" | "To Do" | "In Progress" | "Review" | "Blocked" | "Done";
 
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   organizationId: string;
@@ -179,6 +189,8 @@ export interface Task {
   estimatedHours: number;
   actualHours: number;
   slaBreached?: boolean;
+  comments?: TaskComment[];
+  notes?: string;
   createdAt: string;
   completedAt?: string;
 }
@@ -308,6 +320,7 @@ export interface Asset {
   category: "Laptop" | "Desktop" | "Monitor" | "Mobile" | "Access Card";
   serialNumber: string;
   assetCode?: string;
+  model?: string;
   employeeName?: string;
   employeeId?: string;
   assignedToName?: string;

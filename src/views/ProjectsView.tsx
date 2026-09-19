@@ -121,7 +121,14 @@ export const ProjectsView: React.FC = () => {
             <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
               {p.code}
             </span>
-            <span className="font-semibold text-slate-900">{p.name}</span>
+            <button
+              type="button"
+              onClick={() => setEditingProject(p)}
+              className="font-semibold text-slate-900 hover:text-blue-600 hover:underline cursor-pointer text-left transition-colors"
+              title="Click to edit project details"
+            >
+              {p.name}
+            </button>
           </div>
           <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{p.description}</div>
         </div>
@@ -212,10 +219,11 @@ export const ProjectsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setEditingProject(p)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer flex items-center gap-1"
             title="Edit Project"
           >
-            <Pencil size={14} />
+            <Pencil size={12} />
+            <span>Edit</span>
           </button>
           <button
             type="button"
@@ -223,7 +231,7 @@ export const ProjectsView: React.FC = () => {
             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
             title="Delete Project"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </div>
       ),

@@ -136,13 +136,16 @@ export const TasksView: React.FC = () => {
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <span
-                  className={`font-semibold ${
-                    isDone ? "line-through text-slate-400 font-normal" : "text-slate-900"
+                <button
+                  type="button"
+                  onClick={() => setEditingTask(t)}
+                  className={`font-semibold text-xs text-left hover:text-blue-600 hover:underline cursor-pointer transition-colors ${
+                    isDone ? "line-through text-slate-400 font-normal" : "text-slate-900 dark:text-white"
                   }`}
+                  title="Click to edit task details"
                 >
                   {t.title}
-                </span>
+                </button>
                 {t.slaBreached && !isDone && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-50 text-rose-600 font-mono font-bold border border-rose-200">
                     SLA Alert
@@ -233,10 +236,11 @@ export const TasksView: React.FC = () => {
             <button
               type="button"
               onClick={() => setEditingTask(t)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors cursor-pointer flex items-center gap-1"
               title="Edit task"
             >
-              <Pencil size={13} />
+              <Pencil size={12} />
+              <span>Edit</span>
             </button>
             <button
               type="button"

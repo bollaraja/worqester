@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
+import { AuthService } from "../../services/auth";
 
 interface Message {
   id: string;
@@ -66,7 +67,7 @@ export const AiAssistantDrawer: React.FC = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("worqester_auth_token");
+      const token = AuthService.getToken() || localStorage.getItem("token") || localStorage.getItem("worqester_auth_token_v1");
       const response = await fetch("/api/ai/ask", {
         method: "POST",
         headers: {

@@ -81,6 +81,7 @@ export const Topbar: React.FC = () => {
     tasks: "Task Kanban & Deliverables",
     hrm: "Resource Matrix",
     workload: "Capacity & Utilization",
+    team: "Capacity & Utilization",
     documents: "Knowledge Repository",
     notes: "Executive Scratchpad",
     reports: "Compliance & Performance Reports",

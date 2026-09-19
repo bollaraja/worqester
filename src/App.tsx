@@ -61,7 +61,7 @@ const AppContent: React.FC = () => {
             {currentView === "projects" && <ProjectsView />}
             {currentView === "tasks" && <TasksView />}
             {currentView === "hrm" && <HrmView />}
-            {currentView === "workload" && <TeamWorkloadView />}
+            {(currentView === "workload" || currentView === "team") && <TeamWorkloadView />}
             {currentView === "documents" && <DocumentsView />}
             {currentView === "notes" && <NotesView />}
             {currentView === "reports" && <ReportsView />}

@@ -21,6 +21,14 @@ import {
   Activity,
   CheckCircle2,
   Building,
+  Laptop,
+  MessageSquare,
+  Pencil,
+  Download,
+  Check,
+  ExternalLink,
+  FileText,
+  UserCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -35,6 +43,9 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import { Task, Employee } from "../types";
+import { EditTaskModal } from "../components/modals/EditModals";
+import { generatePayslipPDF } from "../utils/payslipGenerator";
 
 const pipelineTrendData = [
   { month: "Apr", revenue: 4200000, pipeline: 12000000 },
@@ -64,13 +75,19 @@ export const DashboardView: React.FC = () => {
     setIsAiAssistantOpen,
     setIsAiAuditOpen,
     checkInCurrentUser,
+    checkOutCurrentUser,
     currentUser,
     attendance,
+    updateTask,
+    addTaskComment,
   } = useApp();
 
   const [rangePreset, setRangePreset] = useState<RangePreset>("30d");
   const [startDate, setStartDate] = useState("2026-08-20");
   const [endDate, setEndDate] = useState("2026-09-19");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const isEmployee = currentUser.role === "Employee";
 
   const handlePresetChange = (preset: RangePreset) => {
     setRangePreset(preset);
@@ -138,6 +155,578 @@ export const DashboardView: React.FC = () => {
   const userAttendedToday = attendance.some(
     (a) => a.employeeName === currentUser.name && a.status === "Present"
   );
+
+  // Employee personalized memoized calculations
+  const myTasks = useMemo(() => {
+    return tasks.filter((t) => {
+      const isAssigned =
+        (t.assigneeName && t.assigneeName.toLowerCase() === currentUser.name.toLowerCase()) ||
+        t.assigneeId === currentUser.id;
+      if (!isAssigned) return false;
+      const dt = t.dueDate || "";
+      if (startDate && dt && dt < startDate) return false;
+      if (endDate && dt && dt > endDate) return false;
+      return true;
+    });
+  }, [tasks, currentUser, startDate, endDate]);
+
+  const myActiveTasks = useMemo(() => myTasks.filter((t) => t.status !== "Done"), [myTasks]);
+  const myCompletedTasks = useMemo(() => myTasks.filter((t) => t.status === "Done"), [myTasks]);
+  const myOverdueTasks = useMemo(
+    () =>
+      myTasks.filter(
+        (t) => t.status !== "Done" && (t.slaBreached || (t.dueDate && t.dueDate < "2026-09-19"))
+      ),
+    [myTasks]
+  );
+
+  const myProjects = useMemo(() => {
+    return projects.filter(
+      (p) =>
+        p.teamMemberIds?.includes(currentUser.id) ||
+        p.projectManagerId === currentUser.id ||
+        myTasks.some((t) => t.projectId === p.id)
+    );
+  }, [projects, currentUser, myTasks]);
+
+  const currentUserEmployee = useMemo(() => {
+    return (
+      employees.find((e) => e.email === currentUser.email) ||
+      employees.find((e) => e.fullName.toLowerCase() === currentUser.name.toLowerCase()) ||
+      employees[0] || {
+        fullName: currentUser.name,
+        employeeNumber: "WQ-1001",
+        designation: currentUser.jobTitle || "Software Engineer",
+        department: currentUser.department,
+        salaryBasic: 125000,
+        bankAccountMasked: "HDFC **** 8841",
+        workMode: "On-site" as const,
+        location: "Bengaluru",
+      }
+    );
+  }, [employees, currentUser]);
+
+  if (isEmployee) {
+    return (
+      <div className="space-y-6 pb-12">
+        {/* Top Welcome & Quick Actions Bar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">
+              <span>Employee Workspace & Daily Overview</span>
+              <span>•</span>
+              <span className="font-mono text-slate-400 dark:text-slate-500">Worqester Team Hub</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Welcome back, {currentUser.name}
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              {currentUser.jobTitle || "Team Member"} • {currentUser.department} • {myActiveTasks.length} active deliverables, {myProjects.length} active workstreams.
+            </p>
+          </div>
+
+          {/* Right Controls: Presets + Quick Actions */}
+          <div className="flex flex-col items-start lg:items-end gap-3 shrink-0">
+            {/* Time Filter Presets */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+              <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 px-2 py-0.5 text-[11px] font-medium border-r border-slate-200 dark:border-slate-700">
+                <Calendar size={13} className="text-blue-600 dark:text-blue-400" />
+                <span>Timeframe:</span>
+              </div>
+              {[
+                { id: "today", label: "Today" },
+                { id: "7d", label: "7D" },
+                { id: "30d", label: "30D" },
+                { id: "quarter", label: "QTD" },
+                { id: "ytd", label: "YTD" },
+                { id: "all", label: "All Time" },
+              ].map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handlePresetChange(preset.id as any)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold text-[11px] transition-all cursor-pointer ${
+                    rangePreset === preset.id
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200/80 dark:border-slate-600"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center flex-wrap gap-2.5">
+              {!userAttendedToday ? (
+                <button
+                  type="button"
+                  onClick={checkInCurrentUser}
+                  className="px-3.5 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Clock size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  <span>Mark Today's Check-In</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={checkOutCurrentUser}
+                  className="px-3.5 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 transition-colors"
+                  title="Click to Clock Out"
+                >
+                  <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  <span>Checked In (Clock Out)</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => openCreateModal("task")}
+                className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>New Task</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openCreateModal("leave")}
+                className="px-3.5 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Calendar size={14} className="text-amber-500" />
+                <span>Apply for Leave</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAiAssistantOpen(true)}
+                className="px-3.5 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Sparkles size={14} className="text-indigo-600 dark:text-indigo-400" />
+                <span>AI Briefing</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Employee Personal KPIs Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+          <KpiCard
+            title="My Assigned Tasks"
+            value={myActiveTasks.length}
+            subValue={`${myCompletedTasks.length} Completed`}
+            change={myActiveTasks.length > 0 ? `${myActiveTasks.length} In Progress` : "All Done"}
+            trend="up"
+            comparisonPeriod="Assigned to me"
+            icon={<CheckSquare size={18} />}
+            iconBg="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800"
+            onClick={() => navigateTo("tasks", "kanban")}
+          />
+
+          <KpiCard
+            title="Due Today / Overdue"
+            value={myOverdueTasks.length}
+            subValue={myOverdueTasks.length > 0 ? "Requires Attention" : "All on Track"}
+            change={myOverdueTasks.length > 0 ? "SLA Breached" : "100% on track"}
+            trend={myOverdueTasks.length > 0 ? "down" : "up"}
+            comparisonPeriod="High Priority"
+            icon={<AlertCircle size={18} />}
+            iconBg="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800"
+            onClick={() => navigateTo("tasks", "all")}
+          />
+
+          <KpiCard
+            title="My Active Projects"
+            value={myProjects.length}
+            subValue="Active Workstreams"
+            change="Team Contributor"
+            trend="up"
+            comparisonPeriod="Current sprint"
+            icon={<FolderKanban size={18} />}
+            iconBg="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-800"
+            onClick={() => navigateTo("projects", "all")}
+          />
+
+          <KpiCard
+            title="Attendance Status"
+            value={userAttendedToday ? "Present" : "Pending"}
+            subValue={userAttendedToday ? "In: 09:15 AM IST" : "Check-in Required"}
+            change={userAttendedToday ? "Shift Active" : "Action Needed"}
+            trend={userAttendedToday ? "up" : "down"}
+            comparisonPeriod="Today's Shift"
+            icon={<Clock size={18} />}
+            iconBg="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800"
+            onClick={() => navigateTo("hrm", "attendance")}
+          />
+
+          <KpiCard
+            title="Available Leaves"
+            value="18 Days"
+            subValue="12 Casual • 6 Sick"
+            change="Accrued & Ready"
+            trend="up"
+            comparisonPeriod="FY 2026-27"
+            icon={<Calendar size={18} />}
+            iconBg="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800"
+            onClick={() => navigateTo("hrm", "leave")}
+          />
+
+          <KpiCard
+            title="Reimbursements"
+            value="₹12,400"
+            subValue="1 Claim Pending"
+            change="Under Review"
+            trend="up"
+            comparisonPeriod="Corporate Claims"
+            icon={<DollarSign size={18} />}
+            iconBg="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-800"
+            onClick={() => navigateTo("hrm", "expenses")}
+          />
+        </div>
+
+        {/* Main Content Area: Left (Deliverables & Projects) + Right (Self-Service Hub) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column (2 Cols): Tasks & Project Status */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* My Active Tasks & Deliverables */}
+            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <CheckSquare size={16} className="text-blue-600 dark:text-blue-400" />
+                    <span>My Assigned Tasks & Deliverables ({myTasks.length})</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Tasks assigned to {currentUser.name} with due dates, priority, and direct edit & comment controls
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openCreateModal("task")}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 text-xs font-semibold flex items-center gap-1 cursor-pointer border border-blue-200 dark:border-blue-800"
+                  >
+                    <Plus size={13} />
+                    <span>Add Task</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateTo("tasks", "kanban")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Kanban Board →
+                  </button>
+                </div>
+              </div>
+
+              {myTasks.length === 0 ? (
+                <div className="py-8 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  <CheckSquare size={32} className="mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No tasks assigned in this timeframe</p>
+                  <p className="text-xs text-slate-500 mt-1">Create a new task or pick one from the backlog</p>
+                  <button
+                    type="button"
+                    onClick={() => openCreateModal("task")}
+                    className="mt-3 px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={14} /> Create Task
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {myTasks.slice(0, 6).map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <PriorityBadge priority={task.priority} size="sm" />
+                          <span className="font-semibold text-slate-900 dark:text-white truncate">
+                            {task.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">{task.projectName}</span>
+                          <span>•</span>
+                          <span className="font-mono">Est: {task.estimatedHours || 0}h</span>
+                          {task.notes && (
+                            <>
+                              <span>•</span>
+                              <span className="italic text-slate-600 dark:text-slate-400 truncate max-w-[200px]">
+                                📝 {task.notes}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200 dark:border-slate-700">
+                        <StatusBadge status={task.status} size="sm" />
+                        
+                        <span
+                          className={`text-[10px] font-mono font-medium ${
+                            task.slaBreached
+                              ? "text-rose-600 dark:text-rose-400 font-bold"
+                              : "text-slate-500 dark:text-slate-400"
+                          }`}
+                        >
+                          Due {formatDate(task.dueDate)}
+                        </span>
+
+                        {/* Direct Edit Button */}
+                        <button
+                          type="button"
+                          onClick={() => setEditingTask(task)}
+                          className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 font-semibold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                          title="Edit Task & Manage Comments/Notes"
+                        >
+                          <Pencil size={12} />
+                          <span>Edit</span>
+                        </button>
+
+                        {/* Comments Badge */}
+                        <button
+                          type="button"
+                          onClick={() => setEditingTask(task)}
+                          className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] flex items-center gap-1 cursor-pointer font-mono"
+                          title="View comments"
+                        >
+                          <MessageSquare size={12} />
+                          <span>{task.comments?.length || 0}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* My Assigned Projects */}
+            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                    <FolderKanban size={16} className="text-purple-600 dark:text-purple-400" />
+                    <span>My Project Assignments & Milestones</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Workstreams where you are assigned as a contributor or engineer
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigateTo("projects", "all")}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  All Projects →
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {myProjects.map((p) => (
+                  <div
+                    key={p.id}
+                    onClick={() => navigateTo("projects", "all")}
+                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono text-[11px] text-blue-600 dark:text-blue-400 font-bold">
+                          {p.code}
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">
+                          {p.name}
+                        </span>
+                      </div>
+                      <StatusBadge status={p.health} size="sm" />
+                    </div>
+
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 line-clamp-2">
+                      {p.description}
+                    </p>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          p.health === "Critical"
+                            ? "bg-rose-500"
+                            : p.health === "At Risk"
+                            ? "bg-amber-500"
+                            : "bg-blue-600"
+                        }`}
+                        style={{ width: `${p.progress}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                      <span>{p.progress}% Delivered</span>
+                      <span>Target: {formatDate(p.endDate)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (1 Col): Employee Self-Service Quick Portal */}
+          <div className="space-y-6">
+            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser.name}
+                  className="w-12 h-12 rounded-xl object-cover ring-2 ring-blue-500/40"
+                />
+                <div className="min-w-0">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm truncate">
+                    {currentUser.name}
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {currentUser.jobTitle || "Engineer"} • {currentUser.department}
+                  </p>
+                  <p className="text-[10px] font-mono text-blue-600 dark:text-blue-400">
+                    ID: {currentUserEmployee.employeeNumber || "WQ-1001"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Attendance Shift Clock */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Shift Schedule</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    {userAttendedToday ? "Active Shift" : "Shift Not Started"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  09:30 AM – 06:30 PM IST • Bangalore Centre
+                </p>
+                <div className="pt-1">
+                  {!userAttendedToday ? (
+                    <button
+                      type="button"
+                      onClick={checkInCurrentUser}
+                      className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    >
+                      <Clock size={14} /> Mark Check-In Now
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={checkOutCurrentUser}
+                      className="w-full py-2 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/60 dark:hover:text-rose-300 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                    >
+                      <CheckCircle2 size={14} className="text-emerald-600" /> Clock Out for the Day
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions List */}
+              <div className="space-y-2 pt-1">
+                <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                  Self-Service Shortcuts
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => openCreateModal("leave")}
+                  className="w-full flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-amber-500" />
+                    <span>Apply for Annual / Sick Leave</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">18 Days</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openCreateModal("expense")}
+                  className="w-full flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={14} className="text-emerald-500" />
+                    <span>Claim Travel / Expense</span>
+                  </div>
+                  <ArrowRight size={13} className="text-slate-400" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => generatePayslipPDF(currentUserEmployee as Employee, "August 2026")}
+                  className="w-full flex items-center justify-between p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-semibold cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Download size={14} className="text-blue-600 dark:text-blue-400" />
+                    <span>Download August Payslip (PDF)</span>
+                  </div>
+                  <span className="text-[10px] font-mono">PDF</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateTo("hrm", "assets")}
+                  className="w-full flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Laptop size={14} className="text-indigo-500" />
+                    <span>My Allocated Hardware Assets</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono">2 Devices</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Team Updates */}
+            <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity size={15} className="text-indigo-600 dark:text-indigo-400" />
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
+                    Recent Operations Feed
+                  </h4>
+                </div>
+                <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-mono font-semibold border border-emerald-200 dark:border-emerald-800">
+                  Live
+                </span>
+              </div>
+
+              <div className="space-y-3 max-h-64 overflow-y-auto pr-1 text-xs">
+                {activities.slice(0, 4).map((act) => (
+                  <div key={act.id} className="pb-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{act.title}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{act.timestamp}</span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">{act.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Edit Task Modal Drawer for Employee */}
+        {editingTask && (
+          <EditTaskModal
+            isOpen={!!editingTask}
+            task={editingTask}
+            onClose={() => setEditingTask(null)}
+            onSave={(updated) => {
+              updateTask(editingTask.id, updated);
+              setEditingTask(null);
+            }}
+            onAddComment={addTaskComment}
+            projects={projects}
+            employees={employees}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -567,6 +1156,22 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit Task Modal Drawer for Executive/Manager View */}
+      {editingTask && (
+        <EditTaskModal
+          isOpen={!!editingTask}
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSave={(updated) => {
+            updateTask(editingTask.id, updated);
+            setEditingTask(null);
+          }}
+          onAddComment={addTaskComment}
+          projects={projects}
+          employees={employees}
+        />
+      )}
     </div>
   );
 };

@@ -12,4 +12,7 @@ coverage/
 *.db-shm
 scratch/
 backups/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
 

@@ -446,6 +446,8 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
           project_id VARCHAR(64) NOT NULL,
           title VARCHAR(255) NOT NULL,
           description TEXT,
+          comments TEXT,
+          notes TEXT,
           assignee_id VARCHAR(64),
           priority VARCHAR(32) DEFAULT 'Medium',
           status VARCHAR(32) DEFAULT 'To Do',
@@ -471,6 +473,8 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
               project_id VARCHAR(64) NOT NULL,
               title VARCHAR(255) NOT NULL,
               description TEXT,
+              comments TEXT,
+              notes TEXT,
               assignee_id VARCHAR(64),
               priority VARCHAR(32) DEFAULT 'Medium',
               status VARCHAR(32) DEFAULT 'To Do',
@@ -496,6 +500,8 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
           await tx.execute("ALTER TABLE tasks_migrated RENAME TO tasks;");
         }
       }
+      await addColumnIfNotExists(tx, "tasks", "comments", "TEXT");
+      await addColumnIfNotExists(tx, "tasks", "notes", "TEXT");
 
       // 7. Deals (foreign key to owner user)
       await tx.execute(`

@@ -22,6 +22,8 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  MessageSquare,
+  ArrowUpDown,
 } from "lucide-react";
 import { Task } from "../types";
 import { EditTaskModal } from "../components/modals/EditModals";
@@ -30,6 +32,7 @@ export const TasksView: React.FC = () => {
   const {
     tasks,
     updateTask,
+    addTaskComment,
     createTask,
     deleteItem,
     currentSubView,
@@ -48,6 +51,8 @@ export const TasksView: React.FC = () => {
   const activeSubView = currentSubView || "kanban";
   const [filterProject, setFilterProject] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [filterDate, setFilterDate] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("default");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Quick Task Creator Bar
@@ -60,19 +65,62 @@ export const TasksView: React.FC = () => {
 
   const taskColumns = ["Backlog", "To Do", "In Progress", "In Review", "Done"];
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filterProject !== "all" && t.projectId !== filterProject) return false;
-    if (filterPriority !== "all" && t.priority.toLowerCase() !== filterPriority.toLowerCase()) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.projectName.toLowerCase().includes(q) ||
-        t.assigneeName.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const todayStr = "2026-09-19";
+  const startOfWeek = "2026-09-14";
+  const endOfWeek = "2026-09-20";
+  const startOfMonth = "2026-09-01";
+  const endOfMonth = "2026-09-30";
+
+  const filteredTasks = tasks
+    .filter((t) => {
+      if (filterProject !== "all" && t.projectId !== filterProject) return false;
+      if (filterPriority !== "all" && t.priority.toLowerCase() !== filterPriority.toLowerCase()) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesQuery =
+          t.title.toLowerCase().includes(q) ||
+          t.projectName.toLowerCase().includes(q) ||
+          t.assigneeName.toLowerCase().includes(q) ||
+          (t.notes && t.notes.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
+      }
+      if (filterDate === "today") {
+        return t.dueDate === todayStr;
+      }
+      if (filterDate === "week") {
+        return t.dueDate >= startOfWeek && t.dueDate <= endOfWeek;
+      }
+      if (filterDate === "month") {
+        return t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+      }
+      if (filterDate === "overdue") {
+        return Boolean(t.slaBreached || (t.dueDate && t.dueDate < todayStr && t.status !== "Done"));
+      }
+      if (filterDate === "no-date") {
+        return !t.dueDate;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === "dueDateAsc") {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return a.dueDate.localeCompare(b.dueDate);
+      }
+      if (sortBy === "dueDateDesc") {
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return b.dueDate.localeCompare(a.dueDate);
+      }
+      if (sortBy === "priority") {
+        const pOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+        return (pOrder[b.priority.toLowerCase()] || 0) - (pOrder[a.priority.toLowerCase()] || 0);
+      }
+      if (sortBy === "title") {
+        return a.title.localeCompare(b.title);
+      }
+      return 0;
+    });
 
   const handleQuickCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -399,7 +447,8 @@ export const TasksView: React.FC = () => {
           <select
             value={filterProject}
             onChange={(e) => setFilterProject(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            title="Filter tasks by project"
           >
             <option value="all">All Projects</option>
             {projects.map((p) => (
@@ -413,13 +462,43 @@ export const TasksView: React.FC = () => {
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            title="Filter tasks by priority"
           >
             <option value="all">All Priorities</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
+          </select>
+
+          {/* Date Filter */}
+          <select
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            title="Filter tasks by due date"
+          >
+            <option value="all">📅 All Dates</option>
+            <option value="today">📅 Due Today</option>
+            <option value="week">📅 Due This Week</option>
+            <option value="month">📅 Due This Month</option>
+            <option value="overdue">⚠️ Overdue / SLA Alert</option>
+            <option value="no-date">⚪ No Due Date</option>
+          </select>
+
+          {/* Sort Filter */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+            title="Sort task list order"
+          >
+            <option value="default">⇅ Sort: Default</option>
+            <option value="dueDateAsc">⇅ Due Date (Earliest)</option>
+            <option value="dueDateDesc">⇅ Due Date (Latest)</option>
+            <option value="priority">⇅ Priority (High → Low)</option>
+            <option value="title">⇅ Title (A → Z)</option>
           </select>
 
           <button
@@ -567,15 +646,27 @@ export const TasksView: React.FC = () => {
                               <span />
                             )}
 
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => setEditingTask(task)}
-                                className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                                title="Edit task"
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/40 hover:bg-blue-100 dark:hover:bg-blue-800/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/60 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                                title="Edit task & comments"
                               >
-                                <Pencil size={12} />
+                                <Pencil size={10} />
+                                <span>Edit</span>
                               </button>
+                              {((task.comments && task.comments.length > 0) || task.notes) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTask(task)}
+                                  className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
+                                  title={`${task.comments?.length || 0} comments • Click to open notes & comments`}
+                                >
+                                  <MessageSquare size={10} className="text-blue-500" />
+                                  <span>{task.comments?.length || 0}</span>
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => deleteItem("task", task.id)}
@@ -863,6 +954,9 @@ export const TasksView: React.FC = () => {
           task={editingTask}
           isOpen={true}
           onClose={() => setEditingTask(null)}
+          projects={projects}
+          employees={employees}
+          onAddComment={(taskId, content) => addTaskComment(taskId, content)}
           onSave={(updated) => {
             updateTask(editingTask.id, updated);
             setEditingTask(null);

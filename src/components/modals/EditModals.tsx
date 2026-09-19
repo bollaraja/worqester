@@ -1,10 +1,11 @@
-import React, { useState } from "react";
-import { X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, MessageSquare, StickyNote, Send, Calendar, Clock, User, Check, Plus, AlertCircle, FileText } from "lucide-react";
 import {
   Deal,
   Lead,
   Project,
   Task,
+  TaskComment,
   Employee,
   Milestone,
   Asset,
@@ -498,130 +499,387 @@ interface EditTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updated: Partial<Task>) => void;
+  onAddComment?: (taskId: string, content: string) => void;
+  projects?: Project[];
+  employees?: Employee[];
 }
 
-export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, isOpen, onClose, onSave }) => {
+export const EditTaskModal: React.FC<EditTaskModalProps> = ({
+  task,
+  isOpen,
+  onClose,
+  onSave,
+  onAddComment,
+  projects = [],
+  employees = [],
+}) => {
+  const [activeTab, setActiveTab] = useState<"details" | "notes_comments">("details");
   const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || "");
+  const [notes, setNotes] = useState(task.notes || "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<PriorityLevel>(task.priority);
-  const [dueDate, setDueDate] = useState(task.dueDate);
-  const [estimatedHours, setEstimatedHours] = useState(task.estimatedHours);
-  const [actualHours, setActualHours] = useState(task.actualHours);
+  const [dueDate, setDueDate] = useState(task.dueDate || "");
+  const [estimatedHours, setEstimatedHours] = useState(task.estimatedHours || 0);
+  const [actualHours, setActualHours] = useState(task.actualHours || 0);
+  const [projectId, setProjectId] = useState(task.projectId || "");
+  const [assigneeId, setAssigneeId] = useState(task.assigneeId || "");
+  const [comments, setComments] = useState<TaskComment[]>(task.comments || []);
+  const [newComment, setNewComment] = useState("");
+
+  useEffect(() => {
+    setTitle(task.title);
+    setDescription(task.description || "");
+    setNotes(task.notes || "");
+    setStatus(task.status);
+    setPriority(task.priority);
+    setDueDate(task.dueDate || "");
+    setEstimatedHours(task.estimatedHours || 0);
+    setActualHours(task.actualHours || 0);
+    setProjectId(task.projectId || "");
+    setAssigneeId(task.assigneeId || "");
+    setComments(task.comments || []);
+    setNewComment("");
+  }, [task]);
 
   if (!isOpen) return null;
 
+  const handlePostComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    const commentItem: TaskComment = {
+      id: `cm-${Date.now().toString(36)}`,
+      taskId: task.id,
+      authorId: "usr-current",
+      authorName: "You",
+      content: newComment.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...comments, commentItem];
+    setComments(updated);
+    if (onAddComment) {
+      onAddComment(task.id, newComment.trim());
+    }
+    setNewComment("");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedProj = projects.find((p) => p.id === projectId);
+    const selectedEmp = employees.find((emp) => emp.id === assigneeId);
+
     onSave({
       title,
+      description,
+      notes,
       status,
       priority,
       dueDate,
       estimatedHours: Number(estimatedHours),
       actualHours: Number(actualHours),
+      projectId: projectId || task.projectId,
+      projectName: selectedProj ? selectedProj.name : task.projectName,
+      assigneeId: assigneeId || task.assigneeId,
+      assigneeName: selectedEmp ? selectedEmp.fullName : task.assigneeName,
+      comments,
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-white">Edit Task</h3>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden my-6 flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4 bg-slate-50/70 dark:bg-slate-950/40">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                {task.projectName || "Task"}
+              </span>
+              {task.slaBreached && (
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                  <AlertCircle size={10} /> SLA Alert
+                </span>
+              )}
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1">{title || "Edit Task"}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Task Title</label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
+        {/* Tab Navigation */}
+        <div className="flex items-center border-b border-slate-200 dark:border-slate-800 px-6 bg-slate-50/50 dark:bg-slate-900/40">
+          <button
+            type="button"
+            onClick={() => setActiveTab("details")}
+            className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "details"
+                ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <FileText size={14} />
+            <span>Task Details & Scope</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("notes_comments")}
+            className={`py-3 px-4 text-xs font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "notes_comments"
+                ? "border-blue-600 text-blue-600 dark:text-blue-400 font-bold"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
+          >
+            <MessageSquare size={14} />
+            <span>Notes & Comments</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-mono">
+              {comments.length}
+            </span>
+          </button>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="Backlog">Backlog</option>
-                <option value="To Do">To Do</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Review">Review</option>
-                <option value="Blocked">Blocked</option>
-                <option value="Done">Done</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Priority</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as PriorityLevel)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-                <option value="Critical">Critical</option>
-              </select>
-            </div>
-          </div>
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+          {activeTab === "details" && (
+            <>
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Task Title</label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Summarize the work item..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
+                />
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Est. Hours</label>
-              <input
-                type="number"
-                min={0}
-                value={estimatedHours}
-                onChange={(e) => setEstimatedHours(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">Actual Hours</label>
-              <input
-                type="number"
-                min={0}
-                value={actualHours}
-                onChange={(e) => setActualHours(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          </div>
+              <div>
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Description / Specification</label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Provide technical requirements, acceptance criteria, or context..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-all resize-none"
+                />
+              </div>
 
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">Due Date</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500 font-mono"
-            />
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Parent Project</label>
+                  <select
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  >
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code} - {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Assignee</label>
+                  <select
+                    value={assigneeId}
+                    onChange={(e) => setAssigneeId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.fullName} ({emp.department} - {emp.designation})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Workflow Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
+                  >
+                    <option value="Backlog">Backlog</option>
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Review">In Review</option>
+                    <option value="Blocked">Blocked / Alert</option>
+                    <option value="Done">Done</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Priority Level</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as PriorityLevel)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-medium"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Due Date</label>
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
+                    <Calendar size={13} className="text-slate-400" />
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full bg-transparent border-none text-slate-900 dark:text-white focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Est. Hours</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">Actual Hours</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={actualHours}
+                    onChange={(e) => setActualHours(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === "notes_comments" && (
+            <div className="space-y-5">
+              {/* Internal Notes Section */}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                  <StickyNote size={14} className="text-amber-500" />
+                  <span>Internal Task Notes & Technical Specs</span>
+                </div>
+                <textarea
+                  rows={3}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add persistent notes, technical references, checklist items, or research notes for this task..."
+                  className="w-full p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 resize-none text-xs"
+                />
+                <p className="text-[10px] text-slate-500">Notes are saved automatically when you click Save Changes.</p>
+              </div>
+
+              {/* Task Comments Stream */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                    <MessageSquare size={14} className="text-blue-500" />
+                    <span>Activity & Comments ({comments.length})</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+                  {comments.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/30">
+                      No comments or updates yet. Add the first update below!
+                    </div>
+                  ) : (
+                    comments.map((cm) => (
+                      <div
+                        key={cm.id}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 text-xs space-y-1"
+                      >
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white">
+                            {cm.authorAvatar ? (
+                              <img src={cm.authorAvatar} className="w-4 h-4 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-bold">
+                                {cm.authorName.charAt(0)}
+                              </div>
+                            )}
+                            <span>{cm.authorName}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {new Date(cm.createdAt).toLocaleDateString()} {new Date(cm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed pl-5">
+                          {cm.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add Comment Input */}
+                <div className="flex gap-2 pt-2">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Write a comment or status update..."
+                    className="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handlePostComment(e);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handlePostComment}
+                    disabled={!newComment.trim()}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 transition-all"
+                  >
+                    <Send size={12} />
+                    <span>Post</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer Controls */}
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold"
+              className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold"
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
             >
-              Save Changes
+              <Check size={14} />
+              <span>Save Changes</span>
             </button>
           </div>
         </form>
@@ -629,6 +887,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({ task, isOpen, onCl
     </div>
   );
 };
+
 
 // ==============================
 // EDIT EMPLOYEE MODAL

@@ -8,6 +8,7 @@ import {
   Deal,
   Project,
   Task,
+  TaskComment,
   Employee,
   Department,
   AttendanceRecord,
@@ -123,6 +124,8 @@ interface AppContextType {
   updateProject: (id: string, data: Partial<Project>) => void;
   createTask: (data: Omit<Task, "id" | "createdAt" | "organizationId">) => Task;
   updateTask: (id: string, data: Partial<Task>) => void;
+  addTaskComment: (taskId: string, content: string) => Promise<void>;
+  updateTaskNotes: (taskId: string, notes: string) => void;
   toggleTaskCompletion: (id: string) => void;
   setTaskDueDate: (id: string, dueDate: string) => void;
   createCompany: (data: Omit<Company, "id" | "createdAt" | "updatedAt" | "organizationId">) => void;
@@ -747,6 +750,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateTask(id, { dueDate });
   };
 
+  const addTaskComment = async (taskId: string, content: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target || !content.trim()) return;
+    const newComment: TaskComment = {
+      id: `cm-${Date.now().toString(36)}`,
+      taskId,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatar,
+      content: content.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const updatedComments = [...(target.comments || []), newComment];
+    const updatedList = tasks.map((t) => (t.id === taskId ? { ...t, comments: updatedComments } : t));
+    setTasks(updatedList);
+    StorageService.saveTasks(updatedList);
+    TasksApi.addTaskComment(taskId, content.trim()).catch((e) => console.error("API addTaskComment error:", e));
+    StorageService.addAuditLog({
+      userName: currentUser.name,
+      userRole: currentUser.role,
+      action: "Added Task Comment",
+      entityType: "Task",
+      entityName: target.title,
+      details: `Added comment to task '${target.title}'.`,
+    });
+    refreshData();
+  };
+
+  const updateTaskNotes = (taskId: string, notes: string) => {
+    updateTask(taskId, { notes });
+  };
+
   const createCompany = (data: Omit<Company, "id" | "createdAt" | "updatedAt" | "organizationId">) => {
     const newCompany: Company = {
       ...data,
@@ -1297,6 +1332,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateProject,
         createTask,
         updateTask,
+        addTaskComment,
+        updateTaskNotes,
         toggleTaskCompletion,
         setTaskDueDate,
         createCompany,

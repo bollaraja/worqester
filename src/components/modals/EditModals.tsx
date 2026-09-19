@@ -15,6 +15,10 @@ import {
   ProjectStatus,
   TaskStatus,
   UserRole,
+  Company,
+  Contact,
+  NoteItem,
+  DocumentItem,
 } from "../../types";
 
 // ==============================
@@ -1323,6 +1327,806 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClos
               className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold"
             >
               Send Invitation
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT COMPANY MODAL
+// ==============================
+export interface EditCompanyModalProps {
+  company: Company;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<Company>) => void;
+}
+
+export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({ company, isOpen, onClose, onSave }) => {
+  const [name, setName] = useState(company.name);
+  const [industry, setIndustry] = useState(company.industry);
+  const [annualRevenue, setAnnualRevenue] = useState(company.annualRevenue);
+  const [website, setWebsite] = useState(company.website || "");
+  const [phone, setPhone] = useState(company.phone || "");
+  const [email, setEmail] = useState(company.email || "");
+  const [address, setAddress] = useState(company.address || company.location || "");
+  const [tier, setTier] = useState(company.tier || "Enterprise");
+  const [status, setStatus] = useState(company.status || company.health || "Healthy");
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      industry,
+      annualRevenue: Number(annualRevenue),
+      website,
+      phone,
+      email,
+      address,
+      tier,
+      status,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Company: {company.name}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Company Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Industry</label>
+              <input
+                type="text"
+                required
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Annual Revenue (₹)</label>
+              <input
+                type="number"
+                required
+                value={annualRevenue}
+                onChange={(e) => setAnnualRevenue(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Client Tier</label>
+              <select
+                value={tier}
+                onChange={(e) => setTier(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="Tier 1 Enterprise">Tier 1 Enterprise</option>
+                <option value="Tier 2 Mid-Market">Tier 2 Mid-Market</option>
+                <option value="Tier 3 Growth">Tier 3 Growth</option>
+                <option value="Enterprise">Enterprise</option>
+                <option value="Strategic">Strategic</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Account Health / Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="Healthy">Healthy</option>
+                <option value="Active">Active</option>
+                <option value="At Risk">At Risk</option>
+                <option value="Critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Phone</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Website</label>
+            <input
+              type="text"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Headquarters / Address</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Company
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT CONTACT MODAL
+// ==============================
+export interface EditContactModalProps {
+  contact: Contact;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<Contact>) => void;
+}
+
+export const EditContactModal: React.FC<EditContactModalProps> = ({ contact, isOpen, onClose, onSave }) => {
+  const [name, setName] = useState(contact.name);
+  const [email, setEmail] = useState(contact.email);
+  const [phone, setPhone] = useState(contact.phone || "");
+  const [designation, setDesignation] = useState(contact.designation || contact.title || "");
+  const [location, setLocation] = useState(contact.location || "");
+  const [decisionMaker, setDecisionMaker] = useState(contact.decisionMaker || false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      email,
+      phone,
+      designation,
+      title: designation,
+      location,
+      decisionMaker,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Contact: {contact.name}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Full Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Email</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Phone</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Designation</label>
+              <input
+                type="text"
+                value={designation}
+                onChange={(e) => setDesignation(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Location</label>
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="isDecisionMakerContact"
+              checked={decisionMaker}
+              onChange={(e) => setDecisionMaker(e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <label htmlFor="isDecisionMakerContact" className="text-slate-300 cursor-pointer">
+              Key Stakeholder / Decision Maker
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Contact
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT NOTE MODAL
+// ==============================
+export interface EditNoteModalProps {
+  note: NoteItem;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<NoteItem>) => void;
+}
+
+export const EditNoteModal: React.FC<EditNoteModalProps> = ({ note, isOpen, onClose, onSave }) => {
+  const [title, setTitle] = useState(note.title);
+  const [content, setContent] = useState(note.content);
+  const [tag, setTag] = useState(note.tags[0] || "Executive");
+  const [pinned, setPinned] = useState(note.pinned || false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      title,
+      content,
+      tags: [tag],
+      pinned,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Note: {note.title}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Title / Subject</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Content / Discussion Points</label>
+            <textarea
+              rows={5}
+              required
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 items-center">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Category Tag</label>
+              <select
+                value={tag}
+                onChange={(e) => setTag(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="Executive">Executive</option>
+                <option value="Strategy">Strategy</option>
+                <option value="Client">Client</option>
+                <option value="Internal">Internal</option>
+                <option value="Sprint">Sprint</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 pt-4">
+              <input
+                type="checkbox"
+                id="editNotePinned"
+                checked={pinned}
+                onChange={(e) => setPinned(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="editNotePinned" className="text-slate-300 cursor-pointer">
+                Pin to top of scratchpad
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Note
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT DOCUMENT MODAL
+// ==============================
+export interface EditDocumentModalProps {
+  document: DocumentItem;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<DocumentItem>) => void;
+}
+
+export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({ document, isOpen, onClose, onSave }) => {
+  const [title, setTitle] = useState(document.title);
+  const [version, setVersion] = useState(document.version || "v1.0");
+  const [tagsStr, setTagsStr] = useState(document.tags.join(", "));
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const tags = tagsStr
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    onSave({
+      title,
+      version,
+      tags: tags.length > 0 ? tags : ["Internal"],
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Document: {document.title}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Document Title</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Version</label>
+              <input
+                type="text"
+                required
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Tags (Comma-separated)</label>
+              <input
+                type="text"
+                value={tagsStr}
+                onChange={(e) => setTagsStr(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT MILESTONE MODAL
+// ==============================
+export interface EditMilestoneModalProps {
+  milestone: Milestone;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<Milestone>) => void;
+}
+
+export const EditMilestoneModal: React.FC<EditMilestoneModalProps> = ({ milestone, isOpen, onClose, onSave }) => {
+  const [name, setName] = useState(milestone.name);
+  const [dueDate, setDueDate] = useState(milestone.dueDate);
+  const [weight, setWeight] = useState(milestone.weight || "Medium");
+  const [description, setDescription] = useState(milestone.description || "");
+  const [status, setStatus] = useState<"Completed" | "In Progress" | "Pending Review" | "Planning">(milestone.status);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      dueDate,
+      weight,
+      description,
+      status,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Milestone: {milestone.name}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Milestone Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Due Date</label>
+              <input
+                type="date"
+                required
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="Planning">Planning</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Pending Review">Pending Review</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Strategic Weight</label>
+              <input
+                type="text"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                placeholder="e.g. Critical / High (25%)"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Description</label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Verification gate details..."
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Milestone
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==============================
+// EDIT ASSET MODAL
+// ==============================
+export interface EditAssetModalProps {
+  asset: Asset;
+  employees?: Employee[];
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (updated: Partial<Asset>) => void;
+}
+
+export const EditAssetModal: React.FC<EditAssetModalProps> = ({ asset, employees = [], isOpen, onClose, onSave }) => {
+  const [name, setName] = useState(asset.name);
+  const [category, setCategory] = useState<"Laptop" | "Desktop" | "Monitor" | "Mobile" | "Access Card">(asset.category || "Laptop");
+  const [serialNumber, setSerialNumber] = useState(asset.serialNumber);
+  const [assignedToName, setAssignedToName] = useState(asset.assignedToName || asset.employeeName || "");
+  const [condition, setCondition] = useState<"New" | "Good" | "Fair" | "Repair">(asset.condition || "Good");
+  const [status, setStatus] = useState<"Assigned" | "Available" | "Repair" | "Retired">(asset.status || "Assigned");
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      category,
+      serialNumber,
+      assignedToName,
+      employeeName: assignedToName,
+      condition,
+      status,
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 className="text-base font-bold text-white">Edit Asset: {asset.name}</h3>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Asset Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="Laptop">Laptop</option>
+                <option value="Desktop">Desktop</option>
+                <option value="Monitor">Monitor</option>
+                <option value="Mobile">Mobile</option>
+                <option value="Access Card">Access Card</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Serial Number</label>
+              <input
+                type="text"
+                required
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Assignee</label>
+              {employees.length > 0 ? (
+                <select
+                  value={assignedToName}
+                  onChange={(e) => setAssignedToName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">Unassigned</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.fullName}>
+                      {emp.fullName} ({emp.department})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={assignedToName}
+                  onChange={(e) => setAssignedToName(e.target.value)}
+                  placeholder="Employee Name..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Condition</label>
+              <select
+                value={condition}
+                onChange={(e) => setCondition(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+              >
+                <option value="New">New</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+                <option value="Repair">Repair</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="Assigned">Assigned</option>
+              <option value="Available">Available</option>
+              <option value="Repair">Under Repair</option>
+              <option value="Retired">Retired</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold cursor-pointer"
+            >
+              Save Asset
             </button>
           </div>
         </form>

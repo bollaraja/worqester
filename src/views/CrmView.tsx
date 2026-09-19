@@ -11,6 +11,7 @@ import {
   DollarSign,
   Plus,
   ArrowRight,
+  ArrowLeft,
   Phone,
   Mail,
   ExternalLink,
@@ -23,9 +24,11 @@ import {
   CheckCircle2,
   Trash2,
   Pencil,
+  Search,
+  Filter,
 } from "lucide-react";
 import { Lead, Deal, Company, Contact } from "../types";
-import { EditDealModal, EditLeadModal } from "../components/modals/EditModals";
+import { EditDealModal, EditLeadModal, EditCompanyModal, EditContactModal } from "../components/modals/EditModals";
 
 export const CrmView: React.FC = () => {
   const {
@@ -40,6 +43,8 @@ export const CrmView: React.FC = () => {
     projects,
     updateDeal,
     updateLead,
+    updateCompany,
+    updateContact,
     deleteItem,
     settings,
     selectedEntityId,
@@ -47,6 +52,12 @@ export const CrmView: React.FC = () => {
 
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+
+  // Pipeline search and filter
+  const [pipelineSearch, setPipelineSearch] = useState("");
+  const [pipelinePriority, setPipelinePriority] = useState("all");
 
   // Active tab within CRM
   const activeSubView = currentSubView === "deals" ? "pipeline" : (currentSubView || "pipeline");
@@ -85,8 +96,8 @@ export const CrmView: React.FC = () => {
       sortable: true,
       render: (lead) => (
         <div>
-          <div className="font-semibold text-white">{lead.name}</div>
-          <div className="text-[11px] text-slate-400">{lead.company}</div>
+          <div className="font-semibold text-slate-900 dark:text-white">{lead.name}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">{lead.company}</div>
         </div>
       ),
     },
@@ -94,7 +105,7 @@ export const CrmView: React.FC = () => {
       key: "industry",
       header: "Industry",
       sortable: true,
-      render: (l) => <span className="text-slate-300">{l.industry}</span>,
+      render: (l) => <span className="text-slate-700 dark:text-slate-300">{l.industry}</span>,
     },
     {
       key: "score",
@@ -185,8 +196,8 @@ export const CrmView: React.FC = () => {
       sortable: true,
       render: (c) => (
         <div>
-          <div className="font-semibold text-white">{c.name}</div>
-          <div className="text-[11px] text-slate-400">{c.website}</div>
+          <div className="font-semibold text-slate-900 dark:text-white">{c.name}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">{c.website}</div>
         </div>
       ),
     },
@@ -194,13 +205,14 @@ export const CrmView: React.FC = () => {
       key: "industry",
       header: "Industry",
       sortable: true,
+      render: (c) => <span className="text-slate-700 dark:text-slate-300">{c.industry}</span>,
     },
     {
       key: "tier",
       header: "Client Tier",
       sortable: true,
       render: (c) => (
-        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-mono font-bold bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20">
           {c.tier || "Enterprise"}
         </span>
       ),
@@ -210,7 +222,7 @@ export const CrmView: React.FC = () => {
       header: "Account Revenue",
       sortable: true,
       render: (c) => (
-        <span className="font-mono font-semibold text-slate-200">
+        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
           {formatCurrency(c.annualRevenue, settings.currency, settings.currencySymbol)}
         </span>
       ),
@@ -219,7 +231,7 @@ export const CrmView: React.FC = () => {
       key: "location",
       header: "Headquarters",
       sortable: true,
-      render: (c) => <span className="text-slate-300">{c.location || c.address || "Bengaluru, India"}</span>,
+      render: (c) => <span className="text-slate-600 dark:text-slate-300">{c.location || c.address || "Bengaluru, India"}</span>,
     },
     {
       key: "status",
@@ -228,16 +240,39 @@ export const CrmView: React.FC = () => {
     },
     {
       key: "actions",
-      header: "360 View",
+      header: "Actions",
       render: (c) => (
-        <button
-          type="button"
-          onClick={() => navigateTo("crm", "customer360", c.id)}
-          className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 font-semibold"
-        >
-          <span>Customer 360</span>
-          <ChevronRight size={14} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => navigateTo("crm", "customer360", c.id)}
+            className="flex items-center gap-0.5 text-xs text-blue-500 hover:text-blue-400 font-semibold px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+            title="Customer 360 View"
+          >
+            <span>360°</span>
+            <ChevronRight size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditingCompany(c)}
+            className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Edit Company"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Delete company account "${c.name}"?`)) {
+                deleteItem("company", c.id);
+              }
+            }}
+            className="p-1.5 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Delete Company"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -250,8 +285,8 @@ export const CrmView: React.FC = () => {
       sortable: true,
       render: (cont) => (
         <div>
-          <div className="font-semibold text-white">{cont.name}</div>
-          <div className="text-[11px] text-slate-400">{cont.title || cont.designation}</div>
+          <div className="font-semibold text-slate-900 dark:text-white">{cont.name}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">{cont.title || cont.designation}</div>
         </div>
       ),
     },
@@ -259,7 +294,7 @@ export const CrmView: React.FC = () => {
       key: "companyName",
       header: "Company",
       sortable: true,
-      render: (cont) => <span className="text-slate-300">{cont.companyName}</span>,
+      render: (cont) => <span className="text-slate-700 dark:text-slate-300">{cont.companyName}</span>,
     },
     {
       key: "email",
@@ -267,7 +302,7 @@ export const CrmView: React.FC = () => {
       render: (cont) => (
         <a
           href={`mailto:${cont.email}`}
-          className="flex items-center gap-1.5 text-blue-400 hover:underline"
+          className="flex items-center gap-1.5 text-blue-500 hover:underline"
         >
           <Mail size={12} />
           <span>{cont.email}</span>
@@ -278,7 +313,7 @@ export const CrmView: React.FC = () => {
       key: "phone",
       header: "Phone",
       render: (cont) => (
-        <span className="flex items-center gap-1.5 text-slate-400 font-mono">
+        <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 font-mono">
           <Phone size={12} />
           <span>{cont.phone}</span>
         </span>
@@ -286,15 +321,43 @@ export const CrmView: React.FC = () => {
     },
     {
       key: "decisionMaker",
-      header: "Decision Maker",
+      header: "Decision Role",
       render: (cont) =>
         cont.decisionMaker ? (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/20 font-semibold">
             Key Stakeholder
           </span>
         ) : (
-          <span className="text-[10px] text-slate-500">Influencer</span>
+          <span className="text-[10px] text-slate-400">Influencer</span>
         ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (cont) => (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditingContact(cont)}
+            className="p-1.5 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Edit Contact"
+          >
+            <Pencil size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Delete contact "${cont.name}"?`)) {
+                deleteItem("contact", cont.id);
+              }
+            }}
+            className="p-1.5 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="Delete Contact"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -339,14 +402,37 @@ export const CrmView: React.FC = () => {
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
           {activeSubView === "pipeline" || activeSubView === "deals" ? (
-            <button
-              type="button"
-              onClick={() => openCreateModal("deal")}
-              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
-            >
-              <Plus size={14} />
-              <span>Add Deal</span>
-            </button>
+            <div className="flex items-center flex-wrap gap-2">
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={pipelineSearch}
+                  onChange={(e) => setPipelineSearch(e.target.value)}
+                  placeholder="Filter deals..."
+                  className="pl-7 pr-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 w-36 sm:w-44"
+                />
+              </div>
+              <select
+                value={pipelinePriority}
+                onChange={(e) => setPipelinePriority(e.target.value)}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">All Priorities</option>
+                <option value="Critical">Critical</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => openCreateModal("deal")}
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Add Deal</span>
+              </button>
+            </div>
           ) : activeSubView === "leads" ? (
             <button
               type="button"
@@ -399,13 +485,24 @@ export const CrmView: React.FC = () => {
           {/* Kanban Board Columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 overflow-x-auto pb-4">
             {dealStages.map((stage) => {
-              const stageDeals = deals.filter((d) => d.stage === stage);
+              let stageDeals = deals.filter((d) => d.stage === stage);
+              if (pipelineSearch.trim()) {
+                const q = pipelineSearch.toLowerCase();
+                stageDeals = stageDeals.filter(
+                  (d) =>
+                    d.name.toLowerCase().includes(q) ||
+                    d.companyName.toLowerCase().includes(q)
+                );
+              }
+              if (pipelinePriority !== "all") {
+                stageDeals = stageDeals.filter((d) => d.priority === pipelinePriority);
+              }
               const stageValue = stageDeals.reduce((sum, d) => sum + d.amount, 0);
 
               return (
                 <div
                   key={stage}
-                  className="rounded-2xl bg-slate-900/80 border border-slate-800/80 p-3 flex flex-col min-h-[480px]"
+                  className="rounded-2xl bg-slate-900/90 border border-slate-800 p-3 flex flex-col min-h-[500px]"
                 >
                   {/* Column Header */}
                   <div className="pb-2.5 mb-2.5 border-b border-slate-800 flex items-center justify-between">
@@ -424,72 +521,110 @@ export const CrmView: React.FC = () => {
 
                   {/* Deals in Stage */}
                   <div className="space-y-2.5 flex-1 overflow-y-auto pr-0.5">
-                    {stageDeals.map((deal) => (
-                      <div
-                        key={deal.id}
-                        className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 transition-all text-xs group shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-1.5 mb-1.5">
-                          <span className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors line-clamp-2">
-                            {deal.name}
-                          </span>
-                          <PriorityBadge priority={deal.priority} size="sm" />
-                        </div>
-
-                        <div className="text-[11px] text-slate-400 mb-2 truncate">
-                          {deal.companyName}
-                        </div>
-
-                        <div className="flex items-baseline justify-between text-xs pt-2 border-t border-slate-800/60">
-                          <span className="font-mono font-bold text-emerald-400">
-                            {formatCurrency(deal.amount, settings.currency, settings.currencySymbol)}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            {deal.probability}% Prob.
-                          </span>
-                        </div>
-
-                        {/* Stage transition & edit controls */}
-                        <div className="mt-2 pt-2 border-t border-slate-800/40 flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {deal.expectedCloseDate}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setEditingDeal(deal)}
-                              className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors"
-                              title="Edit Deal"
-                            >
-                              <Pencil size={11} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteItem("deal", deal.id)}
-                              className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
-                              title="Delete Deal"
-                            >
-                              <Trash2 size={11} />
-                            </button>
-                          </div>
-                          {stage !== "Closed Won" && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentIndex = dealStages.indexOf(stage);
-                                if (currentIndex < dealStages.length - 1) {
-                                  handleAdvanceDeal(deal, dealStages[currentIndex + 1]);
-                                }
-                              }}
-                              className="text-[10px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white transition-colors font-semibold flex items-center gap-1"
-                            >
-                              <span>Next</span>
-                              <ArrowRight size={10} />
-                            </button>
-                          )}
-                        </div>
+                    {stageDeals.length === 0 ? (
+                      <div className="text-center py-8 text-[11px] text-slate-500 border border-dashed border-slate-800/80 rounded-xl">
+                        No deals
                       </div>
-                    ))}
+                    ) : (
+                      stageDeals.map((deal) => {
+                        const stageIndex = dealStages.indexOf(stage);
+
+                        return (
+                          <div
+                            key={deal.id}
+                            className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all text-xs group shadow-sm space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-1.5">
+                              <span
+                                onClick={() => setEditingDeal(deal)}
+                                className="font-bold text-slate-100 group-hover:text-blue-400 transition-colors line-clamp-2 cursor-pointer"
+                                title="Click to edit deal"
+                              >
+                                {deal.name}
+                              </span>
+                              <PriorityBadge priority={deal.priority} size="sm" />
+                            </div>
+
+                            <div className="text-[11px] text-slate-400 truncate">
+                              {deal.companyName}
+                            </div>
+
+                            <div className="flex items-baseline justify-between text-xs pt-1.5 border-t border-slate-800/60">
+                              <span className="font-mono font-bold text-emerald-400">
+                                {formatCurrency(deal.amount, settings.currency, settings.currencySymbol)}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {deal.probability}% Prob.
+                              </span>
+                            </div>
+
+                            {/* Bi-Directional Workflow Controls + Prominent Edit/Delete */}
+                            <div className="pt-2 border-t border-slate-800/50 flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between text-[10px]">
+                                <span className="text-slate-400 font-mono flex items-center gap-1">
+                                  <Calendar size={10} className="text-slate-500" />
+                                  {deal.expectedCloseDate}
+                                </span>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingDeal(deal)}
+                                    className="p-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-colors cursor-pointer border border-blue-500/20"
+                                    title="Edit Deal"
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (window.confirm(`Delete deal "${deal.name}"?`)) {
+                                        deleteItem("deal", deal.id);
+                                      }
+                                    }}
+                                    className="p-1 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer border border-rose-500/20"
+                                    title="Delete Deal"
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Navigation Buttons: Prev & Next */}
+                              <div className="flex items-center justify-between gap-1 pt-1">
+                                {stageIndex > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdvanceDeal(deal, dealStages[stageIndex - 1])}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors font-semibold flex items-center gap-0.5 cursor-pointer"
+                                    title={`Move back to ${dealStages[stageIndex - 1]}`}
+                                  >
+                                    <ArrowLeft size={10} />
+                                    <span>Prev</span>
+                                  </button>
+                                ) : (
+                                  <span />
+                                )}
+
+                                {stageIndex < dealStages.length - 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdvanceDeal(deal, dealStages[stageIndex + 1])}
+                                    className="text-[10px] px-2 py-0.5 rounded bg-blue-600/30 text-blue-300 hover:bg-blue-600 hover:text-white transition-colors font-semibold flex items-center gap-0.5 cursor-pointer ml-auto"
+                                    title={`Advance to ${dealStages[stageIndex + 1]}`}
+                                  >
+                                    <span>Next</span>
+                                    <ArrowRight size={10} />
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-400 ml-auto">Won</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               );
@@ -777,6 +912,32 @@ export const CrmView: React.FC = () => {
           onSave={(updated) => {
             updateLead(editingLead.id, updated);
             setEditingLead(null);
+          }}
+        />
+      )}
+
+      {/* Edit Company Modal */}
+      {editingCompany && (
+        <EditCompanyModal
+          company={editingCompany}
+          isOpen={true}
+          onClose={() => setEditingCompany(null)}
+          onSave={(updated) => {
+            updateCompany(editingCompany.id, updated);
+            setEditingCompany(null);
+          }}
+        />
+      )}
+
+      {/* Edit Contact Modal */}
+      {editingContact && (
+        <EditContactModal
+          contact={editingContact}
+          isOpen={true}
+          onClose={() => setEditingContact(null)}
+          onSave={(updated) => {
+            updateContact(editingContact.id, updated);
+            setEditingContact(null);
           }}
         />
       )}

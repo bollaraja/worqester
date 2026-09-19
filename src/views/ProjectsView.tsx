@@ -27,7 +27,7 @@ import {
   Check,
 } from "lucide-react";
 import { Project, Task, Milestone } from "../types";
-import { EditProjectModal, AddMilestoneModal } from "../components/modals/EditModals";
+import { EditProjectModal, AddMilestoneModal, EditMilestoneModal } from "../components/modals/EditModals";
 
 export const ProjectsView: React.FC = () => {
   const {
@@ -48,6 +48,7 @@ export const ProjectsView: React.FC = () => {
   } = useApp();
 
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isAddMilestoneOpen, setIsAddMilestoneOpen] = useState(false);
 
   const activeSubView = currentSubView || "cards";
@@ -767,9 +768,17 @@ export const ProjectsView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className="font-mono text-slate-500 text-xs">{m.dueDate}</span>
                       <StatusBadge status={m.status} size="sm" />
+                      <button
+                        type="button"
+                        onClick={() => setEditingMilestone(m)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                        title="Edit milestone"
+                      >
+                        <Pencil size={13} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => deleteMilestone(m.id)}
@@ -796,6 +805,19 @@ export const ProjectsView: React.FC = () => {
           onSave={(updated) => {
             updateProject(editingProject.id, updated);
             setEditingProject(null);
+          }}
+        />
+      )}
+
+      {/* Edit Milestone Modal */}
+      {editingMilestone && (
+        <EditMilestoneModal
+          milestone={editingMilestone}
+          isOpen={true}
+          onClose={() => setEditingMilestone(null)}
+          onSave={(updated) => {
+            updateMilestone(editingMilestone.id, updated);
+            setEditingMilestone(null);
           }}
         />
       )}

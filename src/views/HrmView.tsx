@@ -25,7 +25,7 @@ import {
   Star,
 } from "lucide-react";
 import { Employee, AttendanceRecord, LeaveRequest, JobPosition, Candidate, Expense, Asset } from "../types";
-import { EditEmployeeModal, AddAssetModal, AddCandidateModal } from "../components/modals/EditModals";
+import { EditEmployeeModal, AddAssetModal, AddCandidateModal, EditAssetModal } from "../components/modals/EditModals";
 import { generatePayslipPDF } from "../utils/payslipGenerator";
 
 export const HrmView: React.FC = () => {
@@ -45,6 +45,7 @@ export const HrmView: React.FC = () => {
     updateExpenseStatus,
     updateEmployee,
     createAsset,
+    updateAsset,
     deleteAsset,
     createCandidate,
     updateCandidate,
@@ -58,6 +59,7 @@ export const HrmView: React.FC = () => {
   } = useApp();
 
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [isAddAssetOpen, setIsAddAssetOpen] = useState(false);
   const [isAddCandidateOpen, setIsAddCandidateOpen] = useState(false);
 
@@ -83,8 +85,8 @@ export const HrmView: React.FC = () => {
             className="w-8 h-8 rounded-lg object-cover ring-1 ring-blue-500/30"
           />
           <div>
-            <div className="font-semibold text-white">{emp.fullName}</div>
-            <div className="text-[10px] font-mono text-blue-400 font-bold">
+            <div className="font-semibold text-slate-900 dark:text-white">{emp.fullName}</div>
+            <div className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold">
               {emp.employeeNumber} • {emp.email}
             </div>
           </div>
@@ -97,8 +99,8 @@ export const HrmView: React.FC = () => {
       sortable: true,
       render: (emp) => (
         <div>
-          <div className="text-slate-200">{emp.designation}</div>
-          <div className="text-[11px] text-slate-400">{emp.department}</div>
+          <div className="text-slate-800 dark:text-slate-200 font-medium">{emp.designation}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">{emp.department}</div>
         </div>
       ),
     },
@@ -113,7 +115,7 @@ export const HrmView: React.FC = () => {
       header: "Work Mode",
       sortable: true,
       render: (emp) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-slate-300">
+        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
           {emp.workMode}
         </span>
       ),
@@ -122,7 +124,7 @@ export const HrmView: React.FC = () => {
       key: "location",
       header: "Location",
       sortable: true,
-      render: (emp) => <span className="text-slate-400">{emp.location}</span>,
+      render: (emp) => <span className="text-slate-600 dark:text-slate-400">{emp.location}</span>,
     },
     {
       key: "salaryBasic",
@@ -130,10 +132,10 @@ export const HrmView: React.FC = () => {
       sortable: true,
       render: (emp) => (
         <div className="font-mono">
-          <span className="text-slate-200 font-semibold">
+          <span className="text-slate-900 dark:text-slate-200 font-semibold">
             {formatCurrency(emp.salaryBasic, settings.currency, settings.currencySymbol)}
           </span>
-          <div className="text-[10px] text-slate-500">{emp.bankAccountMasked}</div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">{emp.bankAccountMasked}</div>
         </div>
       ),
     },
@@ -145,7 +147,7 @@ export const HrmView: React.FC = () => {
           <button
             type="button"
             onClick={() => setEditingEmployee(emp)}
-            className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="Edit Employee Profile"
           >
             <Pencil size={13} />
@@ -153,7 +155,7 @@ export const HrmView: React.FC = () => {
           <button
             type="button"
             onClick={() => deleteItem("employee", emp.id)}
-            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="Delete Employee"
           >
             <Trash2 size={13} />
@@ -810,8 +812,16 @@ export const HrmView: React.FC = () => {
                   <span className="font-mono font-bold text-blue-400">
                     {ast.assetCode || `AST-${ast.id.slice(-4)}`}
                   </span>
-                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5">
                     <StatusBadge status={ast.status} size="sm" />
+                    <button
+                      type="button"
+                      onClick={() => setEditingAsset(ast)}
+                      className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Edit asset"
+                    >
+                      <Pencil size={12} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => deleteAsset(ast.id)}
@@ -848,6 +858,20 @@ export const HrmView: React.FC = () => {
           onSave={(updated) => {
             updateEmployee(editingEmployee.id, updated);
             setEditingEmployee(null);
+          }}
+        />
+      )}
+
+      {/* Edit Asset Modal */}
+      {editingAsset && (
+        <EditAssetModal
+          asset={editingAsset}
+          employees={employees}
+          isOpen={true}
+          onClose={() => setEditingAsset(null)}
+          onSave={(updated) => {
+            updateAsset(editingAsset.id, updated);
+            setEditingAsset(null);
           }}
         />
       )}

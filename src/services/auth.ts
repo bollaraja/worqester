@@ -97,13 +97,14 @@ export class AuthService {
     email: string,
     password: string,
     role: UserRole = "Project Manager",
-    department = "Operations"
+    department = "Operations",
+    company_name?: string
   ): Promise<AuthResponse> {
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role, department }),
+        body: JSON.stringify({ name, email, password, role, department, company_name }),
       });
 
       const data = await res.json();
@@ -118,8 +119,8 @@ export class AuthService {
       };
     } catch (err: any) {
       // Local fallback for offline/preview resilience
-      if (password.length < 6) {
-        return { success: false, error: "Password must be at least 6 characters." };
+      if (password.length < 8) {
+        return { success: false, error: "Password must be at least 8 characters." };
       }
       const dummyUser: User = {
         id: `usr-${Date.now().toString(36)}`,

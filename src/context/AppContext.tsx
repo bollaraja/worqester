@@ -49,6 +49,7 @@ interface AppContextType {
     password: string;
     role?: any;
     department?: string;
+    company_name?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchUser: (userId: string) => void;
@@ -127,6 +128,7 @@ interface AppContextType {
   createCompany: (data: Omit<Company, "id" | "createdAt" | "updatedAt" | "organizationId">) => void;
   updateCompany: (id: string, data: Partial<Company>) => void;
   createContact: (data: Omit<Contact, "id" | "createdAt" | "organizationId">) => void;
+  updateContact: (id: string, data: Partial<Contact>) => void;
   createEmployee: (data: Omit<Employee, "id" | "organizationId">) => void;
   updateEmployee: (id: string, data: Partial<Employee>) => void;
   createLeaveRequest: (data: Omit<LeaveRequest, "id" | "createdAt">) => void;
@@ -146,7 +148,9 @@ interface AppContextType {
   revokeInvitation: (id: string) => void;
   toggleRbacPermission: (capability: string, roleIndex: number) => void;
   createNote: (data: Omit<NoteItem, "id" | "updatedAt">) => void;
+  updateNote: (id: string, data: Partial<NoteItem>) => void;
   addDocument: (doc: Omit<DocumentItem, "id" | "uploadedAt">) => void;
+  updateDocument: (id: string, data: Partial<DocumentItem>) => void;
   deleteItem: (type: string, id: string) => void;
   
   // Attendance actions
@@ -445,13 +449,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     password: string;
     role?: any;
     department?: string;
+    company_name?: string;
   }) => {
     const res = await AuthService.signup(
       data.name,
       data.email,
       data.password,
       data.role || "Project Manager",
-      data.department || "Operations"
+      data.department || "Operations",
+      data.company_name
     );
     if (res.success && res.user) {
       setCurrentUser(res.user);
@@ -783,6 +789,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   };
 
+  const updateContact = (id: string, data: Partial<Contact>) => {
+    const list = contacts.map((c) => (c.id === id ? { ...c, ...data } : c));
+    StorageService.saveContacts(list);
+    setContacts(list);
+    refreshData();
+  };
+
   const createEmployee = (data: Omit<Employee, "id" | "organizationId">) => {
     const newEmp: Employee = {
       ...data,
@@ -1054,6 +1067,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   };
 
+  const updateNote = (id: string, data: Partial<NoteItem>) => {
+    const list = notes.map((n) =>
+      n.id === id ? { ...n, ...data, updatedAt: new Date().toISOString().split("T")[0] } : n
+    );
+    StorageService.saveNotes(list);
+    setNotes(list);
+    refreshData();
+  };
+
   const addDocument = (doc: Omit<DocumentItem, "id" | "uploadedAt">) => {
     const newDoc: DocumentItem = {
       ...doc,
@@ -1061,6 +1083,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       uploadedAt: new Date().toISOString().split("T")[0],
     };
     const list = [newDoc, ...documents];
+    StorageService.saveDocuments(list);
+    setDocuments(list);
+    refreshData();
+  };
+
+  const updateDocument = (id: string, data: Partial<DocumentItem>) => {
+    const list = documents.map((d) => (d.id === id ? { ...d, ...data } : d));
     StorageService.saveDocuments(list);
     setDocuments(list);
     refreshData();
@@ -1091,6 +1120,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const filtered = companies.filter((c) => c.id !== id);
       StorageService.saveCompanies(filtered);
       setCompanies(filtered);
+    } else if (type === "contact") {
+      const filtered = contacts.filter((c) => c.id !== id);
+      StorageService.saveContacts(filtered);
+      setContacts(filtered);
     } else if (type === "employee") {
       const filtered = employees.filter((e) => e.id !== id);
       StorageService.saveEmployees(filtered);
@@ -1269,6 +1302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createCompany,
         updateCompany,
         createContact,
+        updateContact,
         createEmployee,
         updateEmployee,
         createLeaveRequest,
@@ -1288,7 +1322,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         revokeInvitation,
         toggleRbacPermission,
         createNote,
+        updateNote,
         addDocument,
+        updateDocument,
         deleteItem,
         checkInCurrentUser,
         checkOutCurrentUser,

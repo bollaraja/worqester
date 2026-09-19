@@ -256,51 +256,51 @@ export const TasksView: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Top Quick Status Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             <span>Total Tasks</span>
-            <CheckSquare size={16} className="text-blue-600" />
+            <CheckSquare size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{tasks.length}</div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white">{tasks.length}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
             Across {projects.length} active enterprise projects
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             <span>Completed</span>
-            <CheckCircle2 size={16} className="text-emerald-600" />
+            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-2xl font-bold text-emerald-600">{completedCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{completedCount}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
             {tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0}% completion rate
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             <span>Pending & In-Flight</span>
-            <Clock size={16} className="text-blue-600" />
+            <Clock size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <div className="text-2xl font-bold text-slate-900">{pendingCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white">{pendingCount}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
             Assigned across engineering & ops teams
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-1">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">
             <span>SLA Attention</span>
-            <AlertCircle size={16} className="text-rose-600" />
+            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
           </div>
-          <div className="text-2xl font-bold text-rose-600">{overdueCount}</div>
-          <div className="text-[11px] text-slate-500 mt-1">Tasks requiring immediate triage</div>
+          <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">{overdueCount}</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Tasks requiring immediate triage</div>
         </div>
       </div>
 
       {/* Quick Add Task Header Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
         <form onSubmit={handleQuickCreate} className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
           <div className="flex-1">
             <input
@@ -309,7 +309,7 @@ export const TasksView: React.FC = () => {
               value={quickTitle}
               onChange={(e) => setQuickTitle(e.target.value)}
               placeholder="What task needs to be done? (e.g. Implement user authentication test suite)..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs bg-slate-50 hover:bg-white focus:bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition-all"
             />
           </div>
 
@@ -318,7 +318,7 @@ export const TasksView: React.FC = () => {
             <select
               value={quickProjectId}
               onChange={(e) => setQuickProjectId(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-800 focus:outline-none focus:border-blue-500 max-w-[200px]"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 max-w-[200px]"
             >
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -331,7 +331,7 @@ export const TasksView: React.FC = () => {
             <select
               value={quickPriority}
               onChange={(e) => setQuickPriority(e.target.value as any)}
-              className="px-2.5 py-2 rounded-xl border border-slate-200 text-xs bg-white text-slate-800 focus:outline-none focus:border-blue-500"
+              className="px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
             >
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
@@ -340,13 +340,13 @@ export const TasksView: React.FC = () => {
             </select>
 
             {/* Due Date Picker */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <Calendar size={13} className="text-slate-400" />
               <input
                 type="date"
                 value={quickDueDate}
                 onChange={(e) => setQuickDueDate(e.target.value)}
-                className="text-xs font-mono text-slate-700 bg-transparent border-none focus:outline-none cursor-pointer"
+                className="text-xs font-mono text-slate-700 dark:text-slate-200 bg-transparent border-none focus:outline-none cursor-pointer"
                 title="Set task due date"
               />
             </div>
@@ -363,8 +363,8 @@ export const TasksView: React.FC = () => {
       </div>
 
       {/* Sub Navigation & Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
           {[
             { id: "kanban", label: "Interactive Kanban", count: tasks.length },
             { id: "all", label: "All Tasks Table", count: tasks.length },
@@ -376,13 +376,13 @@ export const TasksView: React.FC = () => {
               onClick={() => navigateTo("tasks", tab.id)}
               className={`px-3.5 py-2 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeSubView === tab.id
-                  ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                  : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <span>{tab.label}</span>
               {tab.count !== null && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono">
                   {tab.count}
                 </span>
               )}
@@ -395,7 +395,7 @@ export const TasksView: React.FC = () => {
           <select
             value={filterProject}
             onChange={(e) => setFilterProject(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-800 focus:outline-none focus:border-blue-500"
+            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Projects</option>
             {projects.map((p) => (
@@ -409,7 +409,7 @@ export const TasksView: React.FC = () => {
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs bg-white text-slate-800 focus:outline-none focus:border-blue-500"
+            className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
           >
             <option value="all">All Priorities</option>
             <option value="critical">Critical</option>
@@ -438,20 +438,20 @@ export const TasksView: React.FC = () => {
             return (
               <div
                 key={col}
-                className="rounded-2xl bg-slate-100/70 border border-slate-200 p-3.5 flex flex-col min-h-[550px]"
+                className="rounded-2xl bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-3.5 flex flex-col min-h-[550px]"
               >
                 {/* Column Header */}
-                <div className="pb-2.5 mb-2.5 border-b border-slate-200 flex items-center justify-between">
+                <div className="pb-2.5 mb-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-slate-800 tracking-tight">{col}</h4>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 font-semibold">
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-tight">{col}</h4>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
                       {colTasks.length}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => openCreateModal("task")}
-                    className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                    className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
                     title={`Add task to ${col}`}
                   >
                     <Plus size={13} />
@@ -461,7 +461,7 @@ export const TasksView: React.FC = () => {
                 {/* Tasks List */}
                 <div className="space-y-2.5 flex-1 overflow-y-auto pr-0.5">
                   {colTasks.length === 0 ? (
-                    <div className="text-center py-8 text-[11px] text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white/50">
+                    <div className="text-center py-8 text-[11px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-white/50 dark:bg-slate-800/30">
                       No tasks in {col}
                     </div>
                   ) : (
@@ -471,7 +471,7 @@ export const TasksView: React.FC = () => {
                       return (
                         <div
                           key={task.id}
-                          className="p-3 rounded-xl bg-white border border-slate-200 hover:border-slate-300 shadow-xs hover:shadow-sm transition-all text-xs group space-y-2.5"
+                          className="p-3 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/70 hover:border-slate-300 dark:hover:border-slate-600 shadow-xs hover:shadow-sm transition-all text-xs group space-y-2.5"
                         >
                           {/* Top Row: Checkbox + Title + Priority */}
                           <div className="flex items-start gap-2">
@@ -482,7 +482,7 @@ export const TasksView: React.FC = () => {
                               className={`w-4.5 h-4.5 rounded flex items-center justify-center transition-all cursor-pointer shrink-0 mt-0.5 border ${
                                 isDone
                                   ? "bg-emerald-600 border-emerald-600 text-white"
-                                  : "border-slate-300 hover:border-blue-500 bg-white"
+                                  : "border-slate-300 dark:border-slate-600 hover:border-blue-500 bg-white dark:bg-slate-900"
                               }`}
                               title={isDone ? "Mark as Incomplete" : "Mark as Complete"}
                             >
@@ -491,8 +491,9 @@ export const TasksView: React.FC = () => {
 
                             <div className="min-w-0 flex-1">
                               <span
-                                className={`font-semibold block line-clamp-2 transition-colors ${
-                                  isDone ? "line-through text-slate-400 font-normal" : "text-slate-900 group-hover:text-blue-600"
+                                onClick={() => setEditingTask(task)}
+                                className={`font-semibold block line-clamp-2 cursor-pointer transition-colors ${
+                                  isDone ? "line-through text-slate-400 dark:text-slate-500 font-normal" : "text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400"
                                 }`}
                               >
                                 {task.title}
@@ -503,13 +504,13 @@ export const TasksView: React.FC = () => {
                           </div>
 
                           {/* Project Tag */}
-                          <div className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1.5">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                             <span className="truncate">{task.projectName}</span>
                           </div>
 
                           {/* Due Date (Interactive) & Assignee */}
-                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                          <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                             <div className="flex items-center gap-1">
                               <Calendar size={12} className="text-slate-400 shrink-0" />
                               <input
@@ -519,7 +520,7 @@ export const TasksView: React.FC = () => {
                                 className={`bg-transparent border-none text-[11px] font-mono cursor-pointer focus:outline-none ${
                                   task.slaBreached && !isDone
                                     ? "text-rose-600 font-bold"
-                                    : "text-slate-600"
+                                    : "text-slate-600 dark:text-slate-300"
                                 }`}
                                 title="Click to update task due date"
                               />
@@ -533,11 +534,11 @@ export const TasksView: React.FC = () => {
                                     className="w-4 h-4 rounded-full object-cover shrink-0"
                                   />
                                 ) : (
-                                  <div className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-[9px] font-bold">
+                                  <div className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-[9px] font-bold">
                                     {task.assigneeName.charAt(0)}
                                   </div>
                                 )}
-                                <span className="truncate text-[10px] text-slate-600">
+                                <span className="truncate text-[10px] text-slate-600 dark:text-slate-300">
                                   {task.assigneeName.split(" ")[0]}
                                 </span>
                               </div>
@@ -554,9 +555,9 @@ export const TasksView: React.FC = () => {
                                   const idx = taskColumns.indexOf(col);
                                   if (idx > 0) handleAdvanceTask(task, taskColumns[idx - 1]);
                                 }}
-                                className="text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
+                                className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-semibold cursor-pointer"
                               >
-                                ← Back
+                                ← Prev
                               </button>
                             ) : (
                               <span />
@@ -566,7 +567,7 @@ export const TasksView: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => setEditingTask(task)}
-                                className="text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
+                                className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                 title="Edit task"
                               >
                                 <Pencil size={12} />
@@ -574,7 +575,7 @@ export const TasksView: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => deleteItem("task", task.id)}
-                                className="text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
+                                className="p-1 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                                 title="Delete task"
                               >
                                 <Trash2 size={12} />
@@ -590,13 +591,20 @@ export const TasksView: React.FC = () => {
                                   if (idx < taskColumns.length - 1)
                                     handleAdvanceTask(task, taskColumns[idx + 1]);
                                 }}
-                                className="text-blue-600 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-0.5"
+                                className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-semibold cursor-pointer flex items-center gap-0.5"
                               >
-                                <span>Advance</span>
+                                <span>Next</span>
                                 <ArrowRight size={10} />
                               </button>
                             ) : (
-                              <span className="text-emerald-600 font-medium">Finished</span>
+                              <button
+                                type="button"
+                                onClick={() => handleAdvanceTask(task, "In Review")}
+                                className="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-600 dark:text-amber-400 hover:text-amber-700 font-semibold cursor-pointer"
+                                title="Reopen task to In Review"
+                              >
+                                ↺ Reopen
+                              </button>
                             )}
                           </div>
                         </div>
@@ -609,6 +617,7 @@ export const TasksView: React.FC = () => {
           })}
         </div>
       )}
+
 
       {/* VIEW: ALL TASKS TABLE */}
       {activeSubView === "all" && (
@@ -656,11 +665,11 @@ export const TasksView: React.FC = () => {
         };
 
         return (
-          <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Task Schedule & Deliverable Calendar</h3>
-                <p className="text-xs text-slate-500">Interactive monthly grid with SLA deadlines and assigned tasks</p>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Task Schedule & Deliverable Calendar</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Interactive monthly grid with SLA deadlines and assigned tasks</p>
               </div>
 
               {/* Month Switcher Controls */}
@@ -668,18 +677,18 @@ export const TasksView: React.FC = () => {
                 <button
                   type="button"
                   onClick={handlePrevMonth}
-                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                   title="Previous Month"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <div className="text-xs font-bold text-slate-800 w-36 text-center font-mono">
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200 w-36 text-center font-mono">
                   {monthNames[calendarMonth]} {calendarYear}
                 </div>
                 <button
                   type="button"
                   onClick={handleNextMonth}
-                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
                   title="Next Month"
                 >
                   <ChevronRight size={16} />
@@ -690,7 +699,7 @@ export const TasksView: React.FC = () => {
                     setCalendarYear(2026);
                     setCalendarMonth(8);
                   }}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer ml-1"
+                  className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer ml-1"
                 >
                   Today
                 </button>
@@ -698,8 +707,8 @@ export const TasksView: React.FC = () => {
             </div>
 
             {/* 7-Column Month Grid */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200 text-center text-xs font-bold text-slate-600 py-2">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+              <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-center text-xs font-bold text-slate-600 dark:text-slate-300 py-2">
                 <div>Sun</div>
                 <div>Mon</div>
                 <div>Tue</div>
@@ -709,10 +718,10 @@ export const TasksView: React.FC = () => {
                 <div>Sat</div>
               </div>
 
-              <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-200 bg-slate-100">
+              <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-200 dark:divide-slate-800 bg-slate-100 dark:bg-slate-950">
                 {daysArray.map((dayNum, idx) => {
                   if (dayNum === null) {
-                    return <div key={`empty-${idx}`} className="bg-slate-50/50 min-h-[90px]" />;
+                    return <div key={`empty-${idx}`} className="bg-slate-50/50 dark:bg-slate-900/30 min-h-[90px]" />;
                   }
 
                   const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
@@ -722,20 +731,20 @@ export const TasksView: React.FC = () => {
                   return (
                     <div
                       key={`day-${dayNum}`}
-                      className={`bg-white p-2 min-h-[95px] flex flex-col justify-between transition-colors hover:bg-blue-50/20 ${
+                      className={`bg-white dark:bg-slate-900 p-2 min-h-[95px] flex flex-col justify-between transition-colors hover:bg-blue-50/20 dark:hover:bg-blue-950/20 ${
                         isToday ? "ring-2 ring-blue-500 ring-inset" : ""
                       }`}
                     >
                       <div className="flex items-center justify-between">
                         <span
                           className={`text-xs font-bold font-mono px-1.5 py-0.5 rounded ${
-                            isToday ? "bg-blue-600 text-white" : "text-slate-700"
+                            isToday ? "bg-blue-600 text-white" : "text-slate-700 dark:text-slate-300"
                           }`}
                         >
                           {dayNum}
                         </span>
                         {dayTasks.length > 0 && (
-                          <span className="text-[10px] font-mono text-slate-400">
+                          <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
                             {dayTasks.length} {dayTasks.length === 1 ? "task" : "tasks"}
                           </span>
                         )}

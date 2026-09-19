@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { useApp } from "../context/AppContext";
-import { FileText, Download, Plus, Search, Tag, Trash2, Folder, ExternalLink } from "lucide-react";
+import { FileText, Download, Plus, Search, Tag, Trash2, Folder, ExternalLink, Pencil } from "lucide-react";
 import { DocumentItem } from "../types";
+import { EditDocumentModal } from "../components/modals/EditModals";
 
 export const DocumentsView: React.FC = () => {
-  const { documents, addDocument, deleteItem, currentUser } = useApp();
+  const { documents, addDocument, updateDocument, deleteItem, currentUser } = useApp();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTag, setSelectedTag] = useState<string>("all");
+  const [editingDoc, setEditingDoc] = useState<DocumentItem | null>(null);
 
   const filteredDocs = documents.filter((doc) => {
     const matchesSearch =
       doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesTag = selectedTag === "all" || doc.tags.includes(selectedTag);
     return matchesSearch && matchesTag;
@@ -34,12 +37,12 @@ export const DocumentsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Enterprise Knowledge & Documents
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Centralized repository for contracts, architecture briefs, and policies
           </p>
         </div>
@@ -47,7 +50,7 @@ export const DocumentsView: React.FC = () => {
         <button
           type="button"
           onClick={handleUploadSim}
-          className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+          className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
         >
           <Plus size={14} />
           <span>Upload Document</span>
@@ -57,13 +60,13 @@ export const DocumentsView: React.FC = () => {
       {/* Search and Tags Filter */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="relative max-w-md w-full">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search documents by title or keyword..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:outline-none focus:border-blue-500"
+            className="w-full pl-9 pr-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -71,10 +74,10 @@ export const DocumentsView: React.FC = () => {
           <button
             type="button"
             onClick={() => setSelectedTag("all")}
-            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors cursor-pointer ${
               selectedTag === "all"
                 ? "bg-blue-600 text-white"
-                : "bg-slate-900 text-slate-400 hover:bg-slate-800"
+                : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
             }`}
           >
             All Tags
@@ -84,10 +87,10 @@ export const DocumentsView: React.FC = () => {
               key={tag}
               type="button"
               onClick={() => setSelectedTag(tag)}
-              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-colors cursor-pointer ${
                 selectedTag === tag
                   ? "bg-blue-600 text-white"
-                  : "bg-slate-900 text-slate-400 hover:bg-slate-800"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800"
               }`}
             >
               {tag}
@@ -101,24 +104,27 @@ export const DocumentsView: React.FC = () => {
         {filteredDocs.map((doc) => (
           <div
             key={doc.id}
-            className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 shadow-sm space-y-3 text-xs group hover:border-slate-700 transition-all"
+            className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs hover:shadow-sm space-y-3 text-xs group hover:border-slate-300 dark:hover:border-slate-700 transition-all"
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center font-mono font-bold text-xs uppercase">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 flex items-center justify-center font-mono font-bold text-xs uppercase">
                   {doc.fileType}
                 </div>
-                <div>
-                  <h4 className="font-bold text-white group-hover:text-blue-400 transition-colors line-clamp-1">
+                <div className="min-w-0">
+                  <h4
+                    onClick={() => setEditingDoc(doc)}
+                    className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1 cursor-pointer"
+                  >
                     {doc.title}
                   </h4>
-                  <span className="text-[10px] text-slate-500 font-mono">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                     {doc.fileName} • {doc.fileSize}
                   </span>
                 </div>
               </div>
 
-              <span className="font-mono text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-semibold">
+              <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded font-semibold border border-slate-200 dark:border-slate-700 shrink-0">
                 {doc.version}
               </span>
             </div>
@@ -127,37 +133,64 @@ export const DocumentsView: React.FC = () => {
               {doc.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 rounded text-[10px] bg-slate-800/80 text-slate-300 font-mono"
+                  className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono"
                 >
                   #{tag}
                 </span>
               ))}
             </div>
 
-            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-              <span>Uploaded {doc.uploadedAt} by {doc.uploadedBy}</span>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="truncate max-w-[150px]">By {doc.uploadedBy}</span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => alert(`Downloading ${doc.fileName}...`)}
-                  className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors"
+                  onClick={() => setEditingDoc(doc)}
+                  className="p-1.5 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Edit Document"
+                >
+                  <Pencil size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const blob = new Blob([`Worqestra Document: ${doc.title}\nVersion: ${doc.version}\nUploaded By: ${doc.uploadedBy}`], { type: "text/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = doc.fileName;
+                    a.click();
+                  }}
+                  className="p-1.5 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Download File"
                 >
-                  <Download size={14} />
+                  <Download size={13} />
                 </button>
                 <button
                   type="button"
                   onClick={() => deleteItem("document", doc.id)}
-                  className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                  className="p-1.5 rounded text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   title="Delete Document"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {editingDoc && (
+        <EditDocumentModal
+          document={editingDoc}
+          isOpen={true}
+          onClose={() => setEditingDoc(null)}
+          onSave={(updated) => {
+            updateDocument(editingDoc.id, updated);
+            setEditingDoc(null);
+          }}
+        />
+      )}
     </div>
   );
 };

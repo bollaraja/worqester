@@ -117,11 +117,64 @@ export class StorageService {
   }
 
   static getSettings(): SystemSettings {
-    return this.load(STORAGE_KEYS.SETTINGS, initialSettings);
+    const raw: Partial<SystemSettings> = this.load<SystemSettings>(STORAGE_KEYS.SETTINGS, initialSettings) || {};
+    const defaultModules = {
+      crm: true,
+      projects: true,
+      tasks: true,
+      hrm: true,
+      recruitment: true,
+      attendance: true,
+      expenses: true,
+      assets: true,
+      documents: true,
+      reports: true,
+      ai: true,
+      automations: true,
+    };
+    const mergedModules = {
+      ...defaultModules,
+      ...(raw.modulesEnabled || {}),
+      ...(raw.enabledModules || {}),
+    };
+    return {
+      companyName: raw.companyName || initialSettings.companyName,
+      tagline: raw.tagline || initialSettings.tagline,
+      currency: raw.currency || initialSettings.currency,
+      currencySymbol: raw.currencySymbol || initialSettings.currencySymbol,
+      timezone: raw.timezone || initialSettings.timezone,
+      theme: raw.theme || initialSettings.theme,
+      enabledModules: mergedModules,
+      modulesEnabled: mergedModules,
+    };
   }
 
   static saveSettings(settings: SystemSettings): void {
-    this.save(STORAGE_KEYS.SETTINGS, settings);
+    const defaultModules = {
+      crm: true,
+      projects: true,
+      tasks: true,
+      hrm: true,
+      recruitment: true,
+      attendance: true,
+      expenses: true,
+      assets: true,
+      documents: true,
+      reports: true,
+      ai: true,
+      automations: true,
+    };
+    const mergedModules = {
+      ...defaultModules,
+      ...(settings?.modulesEnabled || {}),
+      ...(settings?.enabledModules || {}),
+    };
+    const normalized: SystemSettings = {
+      ...settings,
+      enabledModules: mergedModules,
+      modulesEnabled: mergedModules,
+    };
+    this.save(STORAGE_KEYS.SETTINGS, normalized);
   }
 
   static getCompanies(): Company[] {

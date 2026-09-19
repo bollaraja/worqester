@@ -418,7 +418,7 @@ export const ReportsView: React.FC = () => {
             </span>
           </div>
           <div className="text-lg font-bold font-mono text-slate-900 dark:text-white">
-            {formatCurrency(realizedRevenue, settings.currency, settings.currencySymbol)}
+            {formatCurrency(realizedRevenue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           </div>
           <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
             <TrendingUp size={12} />
@@ -434,7 +434,7 @@ export const ReportsView: React.FC = () => {
             </span>
           </div>
           <div className="text-lg font-bold font-mono text-slate-900 dark:text-white">
-            {formatCurrency(openPipelineValue, settings.currency, settings.currencySymbol)}
+            {formatCurrency(openPipelineValue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
             {filteredDeals.length} active opportunities
@@ -479,7 +479,7 @@ export const ReportsView: React.FC = () => {
             </span>
           </div>
           <div className="text-lg font-bold font-mono text-slate-900 dark:text-white">
-            {formatCurrency(totalCapitalSpent, settings.currency, settings.currencySymbol)}
+            {formatCurrency(totalCapitalSpent, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
             {budgetUtilization}% of allocated budgets
@@ -722,7 +722,7 @@ export const ReportsView: React.FC = () => {
                   </td>
                   <td className="p-3 font-mono text-slate-500">{d.expectedCloseDate}</td>
                   <td className="p-3 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatCurrency(d.amount, settings.currency, settings.currencySymbol)}
+                    {formatCurrency(d.amount, settings?.currency || "INR", settings?.currencySymbol || "₹")}
                   </td>
                   <td className="p-3 font-medium text-blue-600 dark:text-blue-400">{d.stage}</td>
                 </tr>

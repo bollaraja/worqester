@@ -40,11 +40,28 @@ export const SettingsView: React.FC = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const activeSubView = currentSubView || "general";
 
-  const [companyName, setCompanyName] = useState(settings.companyName);
-  const [tagline, setTagline] = useState(settings.tagline);
-  const [currency, setCurrency] = useState(settings.currency);
-  const [currencySymbol, setCurrencySymbol] = useState(settings.currencySymbol);
+  const [companyName, setCompanyName] = useState(settings?.companyName || "Worqester Technologies");
+  const [tagline, setTagline] = useState(settings?.tagline || "");
+  const [currency, setCurrency] = useState(settings?.currency || "INR");
+  const [currencySymbol, setCurrencySymbol] = useState(settings?.currencySymbol || "₹");
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const currentModules: Record<string, boolean> = {
+    crm: true,
+    projects: true,
+    tasks: true,
+    hrm: true,
+    recruitment: true,
+    attendance: true,
+    expenses: true,
+    assets: true,
+    documents: true,
+    reports: true,
+    ai: true,
+    automations: true,
+    ...(settings?.modulesEnabled || {}),
+    ...(settings?.enabledModules || {}),
+  };
 
   const handleSaveGeneral = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,12 +75,15 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
-  const handleToggleModule = (modKey: keyof typeof settings.modulesEnabled) => {
+  const handleToggleModule = (modKey: string) => {
+    const isCurrentlyEnabled = currentModules[modKey] ?? true;
+    const nextModules = {
+      ...currentModules,
+      [modKey]: !isCurrentlyEnabled,
+    };
     updateSettings({
-      modulesEnabled: {
-        ...settings.modulesEnabled,
-        [modKey]: !settings.modulesEnabled[modKey],
-      },
+      modulesEnabled: nextModules,
+      enabledModules: nextModules as any,
     });
   };
 
@@ -344,28 +364,31 @@ export const SettingsView: React.FC = () => {
                 { key: "projects" as const, name: "Project Management & Roadmaps", desc: "Initiatives, milestone tracking, budget burn" },
                 { key: "tasks" as const, name: "Task Execution & Kanban", desc: "Interactive sprint boards, SLA compliance, time tracking" },
                 { key: "ai" as const, name: "Worqester AI & Automations", desc: "Autonomous briefings, smart priority, operations audits" },
-              ].map((mod) => (
-                <div
-                  key={mod.key}
-                  className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center justify-between"
-                >
-                  <div>
-                    <h4 className="font-bold text-white text-xs">{mod.name}</h4>
-                    <p className="text-slate-400 text-[11px] mt-0.5">{mod.desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleModule(mod.key)}
-                    className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-colors ${
-                      settings.modulesEnabled[mod.key]
-                        ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30"
-                        : "bg-slate-800 text-slate-500"
-                    }`}
+              ].map((mod) => {
+                const isEnabled = Boolean(currentModules[mod.key]);
+                return (
+                  <div
+                    key={mod.key}
+                    className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/60 flex items-center justify-between"
                   >
-                    {settings.modulesEnabled[mod.key] ? "ENABLED" : "DISABLED"}
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <h4 className="font-bold text-white text-xs">{mod.name}</h4>
+                      <p className="text-slate-400 text-[11px] mt-0.5">{mod.desc}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleModule(mod.key)}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-colors ${
+                        isEnabled
+                          ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-slate-800 text-slate-500"
+                      }`}
+                    >
+                      {isEnabled ? "ENABLED" : "DISABLED"}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

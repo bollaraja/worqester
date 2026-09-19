@@ -157,6 +157,23 @@ export const Sidebar: React.FC = () => {
 
   const { currentUser } = useApp();
 
+  const enabledModules = {
+    crm: true,
+    projects: true,
+    tasks: true,
+    hrm: true,
+    recruitment: true,
+    attendance: true,
+    expenses: true,
+    assets: true,
+    documents: true,
+    reports: true,
+    ai: true,
+    automations: true,
+    ...(settings?.modulesEnabled || {}),
+    ...(settings?.enabledModules || {}),
+  };
+
   return (
     <aside
       className={`h-screen sticky top-0 flex flex-col bg-slate-900 border-r border-slate-800 text-slate-300 transition-all duration-300 z-30 select-none ${
@@ -229,7 +246,7 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* CRM */}
-        {settings.enabledModules.crm && (
+        {enabledModules.crm && (
           <NavGroup
             title="CRM"
             icon={<Building2 size={18} />}
@@ -284,7 +301,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Projects */}
-        {settings.enabledModules.projects && (
+        {enabledModules.projects && (
           <NavGroup
             title="Projects"
             icon={<FolderKanban size={18} />}
@@ -317,7 +334,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* Tasks */}
-        {settings.enabledModules.tasks && (
+        {enabledModules.tasks && (
           <NavGroup
             title="Tasks"
             icon={<CheckSquare size={18} />}
@@ -351,7 +368,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* HRM */}
-        {settings.enabledModules.hrm && (
+        {enabledModules.hrm && (
           <NavGroup
             title="HRM"
             icon={<Users size={18} />}
@@ -470,7 +487,7 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* Documents */}
-        {settings.enabledModules.documents && (
+        {enabledModules.documents && (
           <NavGroup
             title="Documents"
             icon={<FileText size={18} />}
@@ -492,7 +509,7 @@ export const Sidebar: React.FC = () => {
         />
 
         {/* Reports */}
-        {settings.enabledModules.reports && (
+        {enabledModules.reports && (
           <NavGroup
             title="Reports & Analytics"
             icon={<BarChart3 size={18} />}
@@ -504,7 +521,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* AI & Automation */}
-        {settings.enabledModules.ai && (
+        {enabledModules.ai && (
           <NavGroup
             title="AI & Automation"
             icon={<Sparkles size={18} className="text-amber-400" />}

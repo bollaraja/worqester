@@ -134,7 +134,7 @@ export const HrmView: React.FC = () => {
       render: (emp) => (
         <div className="font-mono">
           <span className="text-slate-900 dark:text-slate-200 font-semibold">
-            {formatCurrency(emp.salaryBasic, settings.currency, settings.currencySymbol)}
+            {formatCurrency(emp.salaryBasic, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           </span>
           <div className="text-[10px] text-slate-500 dark:text-slate-400">{emp.bankAccountMasked}</div>
         </div>

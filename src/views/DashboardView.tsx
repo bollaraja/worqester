@@ -695,13 +695,13 @@ export const DashboardView: React.FC = () => {
               </div>
 
               <div className="space-y-3 max-h-64 overflow-y-auto pr-1 text-xs">
-                {activities.slice(0, 4).map((act) => (
-                  <div key={act.id} className="pb-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0">
+                {(activities || []).slice(0, 4).map((act) => (
+                  <div key={act.id || Math.random()} className="pb-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{act.title}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{act.timestamp}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{act.title || "Untitled Activity"}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{act.timestamp || ""}</span>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">{act.description}</p>
+                    <p className="text-slate-600 dark:text-slate-400 text-[11px] mt-0.5">{act.description || ""}</p>
                   </div>
                 ))}
               </div>
@@ -742,7 +742,7 @@ export const DashboardView: React.FC = () => {
             Welcome back, {currentUser.name}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time telemetry for {settings.companyName}: {kpis.activeProjects} active projects,{" "}
+            Real-time telemetry for {settings?.companyName || "Worqester Technologies"}: {kpis.activeProjects} active projects,{" "}
             {periodDeals.length} sales opportunities, and {kpis.totalEmployees} team members.
           </p>
         </div>
@@ -821,7 +821,7 @@ export const DashboardView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3.5">
         <KpiCard
           title="Open Pipeline Value"
-          value={formatCurrency(periodPipelineValue, settings.currency, settings.currencySymbol)}
+          value={formatCurrency(periodPipelineValue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           change="+18.4%"
           trend="up"
           comparisonPeriod={rangePreset === "all" ? "cumulative total" : `for ${rangePreset.toUpperCase()} window`}
@@ -832,7 +832,7 @@ export const DashboardView: React.FC = () => {
 
         <KpiCard
           title="Won Revenue"
-          value={formatCurrency(periodWonRevenue, settings.currency, settings.currencySymbol)}
+          value={formatCurrency(periodWonRevenue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           change="+24.2%"
           trend="up"
           comparisonPeriod={rangePreset === "all" ? "all-time booked" : `${rangePreset.toUpperCase()} booked`}
@@ -1131,24 +1131,28 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-            {activities.slice(0, 5).map((act) => (
+            {(activities || []).slice(0, 5).map((act) => (
               <div
-                key={act.id}
+                key={act.id || Math.random()}
                 className="flex items-start gap-3 text-xs pb-3 border-b border-slate-100 last:border-0 last:pb-0"
               >
                 <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 flex-shrink-0 mt-0.5 font-bold text-[10px]">
-                  {act.userName.charAt(0)}
+                  {(act.userName || "U").charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-800">{act.title}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{act.timestamp}</span>
+                    <span className="font-semibold text-slate-800">{act.title || "Untitled Activity"}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{act.timestamp || ""}</span>
                   </div>
-                  <p className="text-slate-600 text-[11px] mt-0.5">{act.description}</p>
+                  <p className="text-slate-600 text-[11px] mt-0.5">{act.description || ""}</p>
                   <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                    <span>by {act.userName}</span>
-                    <span>•</span>
-                    <span className="text-blue-600 font-medium">{act.entityType}: {act.entityName}</span>
+                    <span>by {act.userName || "Team Member"}</span>
+                    {act.entityType && (
+                      <>
+                        <span>•</span>
+                        <span className="text-blue-600 font-medium">{act.entityType}: {act.entityName || "General"}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

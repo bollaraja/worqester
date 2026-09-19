@@ -88,15 +88,15 @@ export const ProjectsView: React.FC = () => {
   };
 
   const filteredProjects = projects.filter((p) => {
-    if (filterStatus !== "all" && p.status.toLowerCase() !== filterStatus.toLowerCase()) {
+    if (filterStatus !== "all" && (p.status || "").toLowerCase() !== filterStatus.toLowerCase()) {
       return false;
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
-        p.name.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.code || "").toLowerCase().includes(q) ||
+        (p.description || "").toLowerCase().includes(q)
       );
     }
     return true;

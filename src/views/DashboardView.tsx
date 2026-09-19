@@ -192,7 +192,7 @@ export const DashboardView: React.FC = () => {
   const currentUserEmployee = useMemo(() => {
     return (
       employees.find((e) => e.email === currentUser.email) ||
-      employees.find((e) => e.fullName.toLowerCase() === currentUser.name.toLowerCase()) ||
+      employees.find((e) => e.fullName && currentUser.name && e.fullName.toLowerCase() === currentUser.name.toLowerCase()) ||
       employees[0] || {
         fullName: currentUser.name,
         employeeNumber: "WQ-1001",

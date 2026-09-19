@@ -2026,9 +2026,9 @@ export interface EditDocumentModalProps {
 }
 
 export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({ document, isOpen, onClose, onSave }) => {
-  const [title, setTitle] = useState(document.title);
+  const [title, setTitle] = useState(document.title || document.name || "");
   const [version, setVersion] = useState(document.version || "v1.0");
-  const [tagsStr, setTagsStr] = useState(document.tags.join(", "));
+  const [tagsStr, setTagsStr] = useState((Array.isArray(document.tags) ? document.tags : []).join(", "));
 
   if (!isOpen) return null;
 
@@ -2040,6 +2040,8 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({ document, 
       .filter(Boolean);
     onSave({
       title,
+      name: document.name || `${title.toLowerCase().replace(/\s+/g, "_")}.pdf`,
+      fileName: document.fileName || `${title.toLowerCase().replace(/\s+/g, "_")}.pdf`,
       version,
       tags: tags.length > 0 ? tags : ["Internal"],
     });
@@ -2050,7 +2052,7 @@ export const EditDocumentModal: React.FC<EditDocumentModalProps> = ({ document, 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 className="text-base font-bold text-white">Edit Document: {document.title}</h3>
+          <h3 className="text-base font-bold text-white">Edit Document: {document.title || document.name || "Untitled"}</h3>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-white">
             <X size={18} />
           </button>

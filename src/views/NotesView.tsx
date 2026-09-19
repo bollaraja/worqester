@@ -13,12 +13,19 @@ export const NotesView: React.FC = () => {
   const [newTag, setNewTag] = useState("Executive");
   const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
 
-  const filteredNotes = notes.filter(
-    (n) =>
-      n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      n.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredNotes = notes.filter((n) => {
+    const title = n.title || "";
+    const content = n.content || "";
+    const tags = Array.isArray(n.tags) ? n.tags : [];
+    const search = searchTerm.trim().toLowerCase();
+
+    return (
+      !search ||
+      title.toLowerCase().includes(search) ||
+      content.toLowerCase().includes(search) ||
+      tags.some((t) => typeof t === "string" && t.toLowerCase().includes(search))
+    );
+  });
 
   const handleSaveNote = (e: React.FormEvent) => {
     e.preventDefault();

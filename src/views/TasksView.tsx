@@ -74,24 +74,24 @@ export const TasksView: React.FC = () => {
   const filteredTasks = tasks
     .filter((t) => {
       if (filterProject !== "all" && t.projectId !== filterProject) return false;
-      if (filterPriority !== "all" && t.priority.toLowerCase() !== filterPriority.toLowerCase()) return false;
+      if (filterPriority !== "all" && (t.priority || "").toLowerCase() !== filterPriority.toLowerCase()) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesQuery =
-          t.title.toLowerCase().includes(q) ||
-          t.projectName.toLowerCase().includes(q) ||
-          t.assigneeName.toLowerCase().includes(q) ||
-          (t.notes && t.notes.toLowerCase().includes(q));
+          (t.title || "").toLowerCase().includes(q) ||
+          (t.projectName || "").toLowerCase().includes(q) ||
+          (t.assigneeName || "").toLowerCase().includes(q) ||
+          Boolean(t.notes && t.notes.toLowerCase().includes(q));
         if (!matchesQuery) return false;
       }
       if (filterDate === "today") {
         return t.dueDate === todayStr;
       }
       if (filterDate === "week") {
-        return t.dueDate >= startOfWeek && t.dueDate <= endOfWeek;
+        return Boolean(t.dueDate && t.dueDate >= startOfWeek && t.dueDate <= endOfWeek);
       }
       if (filterDate === "month") {
-        return t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+        return Boolean(t.dueDate && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
       }
       if (filterDate === "overdue") {
         return Boolean(t.slaBreached || (t.dueDate && t.dueDate < todayStr && t.status !== "Done"));
@@ -114,10 +114,10 @@ export const TasksView: React.FC = () => {
       }
       if (sortBy === "priority") {
         const pOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-        return (pOrder[b.priority.toLowerCase()] || 0) - (pOrder[a.priority.toLowerCase()] || 0);
+        return (pOrder[(b.priority || "").toLowerCase()] || 0) - (pOrder[(a.priority || "").toLowerCase()] || 0);
       }
       if (sortBy === "title") {
-        return a.title.localeCompare(b.title);
+        return (a.title || "").localeCompare(b.title || "");
       }
       return 0;
     });

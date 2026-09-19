@@ -490,8 +490,8 @@ export const CrmView: React.FC = () => {
                 const q = pipelineSearch.toLowerCase();
                 stageDeals = stageDeals.filter(
                   (d) =>
-                    d.name.toLowerCase().includes(q) ||
-                    d.companyName.toLowerCase().includes(q)
+                    (d.name || "").toLowerCase().includes(q) ||
+                    (d.companyName || "").toLowerCase().includes(q)
                 );
               }
               if (pipelinePriority !== "all") {

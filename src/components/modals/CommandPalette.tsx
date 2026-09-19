@@ -65,19 +65,19 @@ export const CommandPalette: React.FC = () => {
   );
 
   const matchedProjects = projects.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase()) || p.code.toLowerCase().includes(query.toLowerCase())
+    (p.name || "").toLowerCase().includes(query.toLowerCase()) || (p.code || "").toLowerCase().includes(query.toLowerCase())
   );
 
   const matchedTasks = tasks.filter((t) =>
-    t.title.toLowerCase().includes(query.toLowerCase())
+    (t.title || "").toLowerCase().includes(query.toLowerCase())
   );
 
   const matchedCompanies = companies.filter((c) =>
-    c.name.toLowerCase().includes(query.toLowerCase())
+    (c.name || "").toLowerCase().includes(query.toLowerCase())
   );
 
   const matchedEmployees = employees.filter((e) =>
-    e.fullName.toLowerCase().includes(query.toLowerCase()) || e.designation.toLowerCase().includes(query.toLowerCase())
+    (e.fullName || "").toLowerCase().includes(query.toLowerCase()) || (e.designation || "").toLowerCase().includes(query.toLowerCase())
   );
 
   const handleSelectNav = (view: string, subView?: string) => {

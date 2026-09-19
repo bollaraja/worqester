@@ -190,10 +190,10 @@ export const ProjectsView: React.FC = () => {
       render: (p) => (
         <div className="text-xs">
           <div className="font-mono font-semibold text-slate-900">
-            {formatCurrency(p.budget, settings.currency, settings.currencySymbol)}
+            {formatCurrency(p.budget, settings?.currency || "INR", settings?.currencySymbol || "₹")}
           </div>
           <div className="text-[10px] text-slate-500 font-mono">
-            Spent: {formatCurrency(p.spent, settings.currency, settings.currencySymbol)} (
+            Spent: {formatCurrency(p.spent, settings?.currency || "INR", settings?.currencySymbol || "₹")} (
             {Math.round((p.spent / p.budget) * 100)}%)
           </div>
         </div>
@@ -439,7 +439,7 @@ export const ProjectsView: React.FC = () => {
                     <div>
                       <span className="text-slate-400 block text-[11px] mb-0.5">Budget Allocation</span>
                       <span className="font-mono font-semibold text-slate-900">
-                        {formatCurrency(project.budget, settings.currency, settings.currencySymbol)}
+                        {formatCurrency(project.budget, settings?.currency || "INR", settings?.currencySymbol || "₹")}
                       </span>
                     </div>
 

@@ -398,7 +398,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateSettings = (newSettings: Partial<SystemSettings>) => {
-    const updated = { ...settings, ...newSettings };
+    const defaultModules = {
+      crm: true,
+      projects: true,
+      tasks: true,
+      hrm: true,
+      recruitment: true,
+      attendance: true,
+      expenses: true,
+      assets: true,
+      documents: true,
+      reports: true,
+      ai: true,
+      automations: true,
+    };
+    const currentModules = {
+      ...defaultModules,
+      ...(settings?.modulesEnabled || {}),
+      ...(settings?.enabledModules || {}),
+    };
+    const nextModules = {
+      ...currentModules,
+      ...(newSettings.modulesEnabled || {}),
+      ...(newSettings.enabledModules || {}),
+    };
+    const updated: SystemSettings = {
+      ...settings,
+      ...newSettings,
+      enabledModules: nextModules,
+      modulesEnabled: nextModules,
+    };
     setSettings(updated);
     StorageService.saveSettings(updated);
     StorageService.addAuditLog({

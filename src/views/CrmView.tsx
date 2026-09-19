@@ -131,7 +131,7 @@ export const CrmView: React.FC = () => {
       sortable: true,
       render: (l) => (
         <span className="font-mono font-semibold text-slate-200">
-          {formatCurrency(l.expectedValue, settings.currency, settings.currencySymbol)}
+          {formatCurrency(l.expectedValue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
         </span>
       ),
     },
@@ -223,7 +223,7 @@ export const CrmView: React.FC = () => {
       sortable: true,
       render: (c) => (
         <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-          {formatCurrency(c.annualRevenue, settings.currency, settings.currencySymbol)}
+          {formatCurrency(c.annualRevenue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
         </span>
       ),
     },
@@ -466,8 +466,8 @@ export const CrmView: React.FC = () => {
                   deals
                     .filter((d) => d.stage !== "Closed Won" && d.stage !== "Closed Lost")
                     .reduce((s, d) => s + d.amount, 0),
-                  settings.currency,
-                  settings.currencySymbol
+                  settings?.currency || "INR",
+                  settings?.currencySymbol || "₹"
                 )}
               </strong>
             </span>
@@ -476,8 +476,8 @@ export const CrmView: React.FC = () => {
                 deals
                   .filter((d) => d.stage !== "Closed Won" && d.stage !== "Closed Lost")
                   .reduce((s, d) => s + (d.amount * d.probability) / 100, 0),
-                settings.currency,
-                settings.currencySymbol
+                settings?.currency || "INR",
+                settings?.currencySymbol || "₹"
               )}
             </strong></span>
           </div>
@@ -511,7 +511,7 @@ export const CrmView: React.FC = () => {
                         {stage}
                       </h4>
                       <span className="text-[10px] text-slate-400 font-mono">
-                        {formatCurrency(stageValue, settings.currency, settings.currencySymbol)}
+                        {formatCurrency(stageValue, settings?.currency || "INR", settings?.currencySymbol || "₹")}
                       </span>
                     </div>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold">
@@ -551,7 +551,7 @@ export const CrmView: React.FC = () => {
 
                             <div className="flex items-baseline justify-between text-xs pt-1.5 border-t border-slate-800/60">
                               <span className="font-mono font-bold text-emerald-400">
-                                {formatCurrency(deal.amount, settings.currency, settings.currencySymbol)}
+                                {formatCurrency(deal.amount, settings?.currency || "INR", settings?.currencySymbol || "₹")}
                               </span>
                               <span className="text-[10px] font-mono text-slate-400">
                                 {deal.probability}% Prob.
@@ -867,25 +867,33 @@ export const CrmView: React.FC = () => {
           </div>
 
           <div className="space-y-3 divide-y divide-slate-800/60">
-            {activities.map((act) => (
-              <div key={act.id} className="pt-3 first:pt-0 flex items-start gap-3.5 text-xs">
-                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-blue-400 font-bold">
-                  {act.type === "Call" ? "📞" : act.type === "Meeting" ? "🗓️" : "📝"}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white">{act.title}</span>
-                    <span className="text-[11px] text-slate-500 font-mono">{act.timestamp}</span>
+            {(activities || []).length === 0 ? (
+              <p className="text-xs text-slate-500 py-6 text-center">No customer touchpoints logged yet.</p>
+            ) : (
+              (activities || []).map((act) => (
+                <div key={act.id || Math.random()} className="pt-3 first:pt-0 flex items-start gap-3.5 text-xs">
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700/60 flex items-center justify-center text-blue-400 font-bold">
+                    {act.type === "Call" ? "📞" : act.type === "Meeting" ? "🗓️" : "📝"}
                   </div>
-                  <p className="text-slate-400 text-xs mt-0.5">{act.description}</p>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                    <span>Logged by {act.userName}</span>
-                    <span>•</span>
-                    <span className="text-slate-400">{act.entityType}: {act.entityName}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-white">{act.title || "Untitled Engagement"}</span>
+                      <span className="text-[11px] text-slate-500 font-mono">{act.timestamp || ""}</span>
+                    </div>
+                    <p className="text-slate-400 text-xs mt-0.5">{act.description || "No description provided."}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                      <span>Logged by {act.userName || "Team Member"}</span>
+                      {act.entityType && (
+                        <>
+                          <span>•</span>
+                          <span className="text-slate-400">{act.entityType}: {act.entityName || "General"}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

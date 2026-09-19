@@ -98,6 +98,20 @@ export const initialSettings: SystemSettings = {
     ai: true,
     automations: true,
   },
+  modulesEnabled: {
+    crm: true,
+    projects: true,
+    tasks: true,
+    hrm: true,
+    recruitment: true,
+    attendance: true,
+    expenses: true,
+    assets: true,
+    documents: true,
+    reports: true,
+    ai: true,
+    automations: true,
+  },
 };
 
 export const initialCompanies: Company[] = [

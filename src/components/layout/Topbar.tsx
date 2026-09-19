@@ -71,7 +71,7 @@ export const Topbar: React.FC = () => {
   }, []);
 
   const toggleTheme = () => {
-    updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" });
+    updateSettings({ theme: (settings?.theme || "dark") === "dark" ? "light" : "dark" });
   };
 
   const viewLabels: Record<string, string> = {

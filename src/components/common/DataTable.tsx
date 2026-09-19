@@ -122,9 +122,9 @@ export function DataTable<T extends { id: string }>({
   };
 
   return (
-    <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+    <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       {/* Top Bar: Search, Filters, Actions */}
-      <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white">
+      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-2 flex-1 max-w-md">
           <div className="relative w-full">
             <Search
@@ -139,7 +139,7 @@ export function DataTable<T extends { id: string }>({
                 setCurrentPage(1);
               }}
               placeholder={searchPlaceholder}
-              className="w-full pl-9 pr-4 py-1.5 rounded-full bg-slate-100 border border-transparent text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white transition-colors"
+              className="w-full pl-9 pr-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-transparent dark:border-slate-700/60 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-800 transition-colors"
             />
           </div>
           {filterComponent}
@@ -150,7 +150,7 @@ export function DataTable<T extends { id: string }>({
           <button
             type="button"
             onClick={exportCsv}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold transition-colors border border-slate-200 cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors border border-slate-200 dark:border-slate-700 cursor-pointer"
             title="Export CSV"
           >
             <Download size={13} />
@@ -163,7 +163,7 @@ export function DataTable<T extends { id: string }>({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase tracking-wider font-bold text-slate-500">
+            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">
               <th className="p-3.5 pl-4 w-10">
                 <input
                   type="checkbox"
@@ -171,7 +171,7 @@ export function DataTable<T extends { id: string }>({
                     paginatedData.length > 0 && selectedIds.length === paginatedData.length
                   }
                   onChange={toggleSelectAll}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 cursor-pointer bg-white dark:bg-slate-900"
                 />
               </th>
               {columns.map((col) => (
@@ -184,7 +184,7 @@ export function DataTable<T extends { id: string }>({
                     <button
                       type="button"
                       onClick={() => toggleSort(col.key)}
-                      className="flex items-center gap-1.5 hover:text-slate-900 transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
                     >
                       <span>{col.header}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
@@ -196,7 +196,7 @@ export function DataTable<T extends { id: string }>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-600">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-600 dark:text-slate-300">
             {paginatedData.length > 0 ? (
               paginatedData.map((item) => {
                 const isSelected = selectedIds.includes(item.id);
@@ -208,8 +208,8 @@ export function DataTable<T extends { id: string }>({
                       onRowClick ? "cursor-pointer" : ""
                     } ${
                       isSelected
-                        ? "bg-blue-50/80 hover:bg-blue-50"
-                        : "hover:bg-slate-50"
+                        ? "bg-blue-50/80 dark:bg-blue-950/40 hover:bg-blue-50 dark:hover:bg-blue-950/60"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     }`}
                   >
                     <td className="p-3.5 pl-4">
@@ -217,11 +217,11 @@ export function DataTable<T extends { id: string }>({
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => toggleSelectRow(item.id, e as any)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 cursor-pointer bg-white dark:bg-slate-900"
                       />
                     </td>
                     {columns.map((col) => (
-                      <td key={col.key} className="p-3.5 text-slate-700">
+                      <td key={col.key} className="p-3.5 text-slate-700 dark:text-slate-200">
                         {col.render ? col.render(item) : (item as any)[col.key] ?? "—"}
                       </td>
                     ))}
@@ -243,17 +243,17 @@ export function DataTable<T extends { id: string }>({
       </div>
 
       {/* Pagination Footer */}
-      <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+      <div className="p-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
         <div>
           Showing{" "}
-          <span className="font-semibold text-slate-800">
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
             {sortedData.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}
           </span>{" "}
           to{" "}
-          <span className="font-semibold text-slate-800">
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
             {Math.min(currentPage * pageSize, sortedData.length)}
           </span>{" "}
-          of <span className="font-semibold text-slate-800">{sortedData.length}</span>{" "}
+          of <span className="font-semibold text-slate-800 dark:text-slate-200">{sortedData.length}</span>{" "}
           entries
         </div>
 
@@ -262,18 +262,18 @@ export function DataTable<T extends { id: string }>({
             type="button"
             disabled={currentPage <= 1}
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 cursor-pointer"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 dark:text-slate-300 cursor-pointer"
           >
             <ChevronLeft size={14} />
           </button>
-          <span className="px-2 text-xs font-mono font-semibold text-slate-700">
+          <span className="px-2 text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
             {currentPage} / {totalPages}
           </span>
           <button
             type="button"
             disabled={currentPage >= totalPages}
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 cursor-pointer"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-600 dark:text-slate-300 cursor-pointer"
           >
             <ChevronRight size={14} />
           </button>

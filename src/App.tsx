@@ -18,16 +18,31 @@ import { GlobalCreateModal } from "./components/modals/GlobalCreateModal";
 import { CommandPalette } from "./components/modals/CommandPalette";
 import { AiAssistantDrawer } from "./components/ai/AiAssistantDrawer";
 import { AiOperationsAuditModal } from "./components/ai/AiOperationsAuditModal";
+import { useEffect } from "react";
 
 const AppContent: React.FC = () => {
-  const { currentView, isAuthenticated } = useApp();
+  const { currentView, isAuthenticated, settings } = useApp();
+
+  const isDark = settings?.theme === "dark";
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDark]);
 
   if (!isAuthenticated) {
     return <AuthView />;
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 antialiased font-sans">
+    <div
+      className={`flex h-screen w-screen overflow-hidden antialiased font-sans transition-colors duration-200 ${
+        isDark ? "bg-slate-950 text-slate-100 dark" : "bg-slate-50 text-slate-900"
+      }`}
+    >
       {/* Sidebar Navigation */}
       <Sidebar />
 
@@ -35,7 +50,11 @@ const AppContent: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         <Topbar />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main
+          className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 transition-colors duration-200 ${
+            isDark ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
+          }`}
+        >
           <div className="max-w-7xl mx-auto">
             {currentView === "dashboard" && <DashboardView />}
             {currentView === "crm" && <CrmView />}

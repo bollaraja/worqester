@@ -747,4 +747,17 @@ export async function runMigrations(db: DatabaseAdapter): Promise<void> {
     });
     console.log("[Database Migration] Successfully applied 002_add_employee_user_id.");
   }
+
+  if (!applied.has("003_add_task_comments_notes_and_fields")) {
+    console.log("[Database Migration] Applying 003_add_task_comments_notes_and_fields...");
+    await db.transaction(async (tx) => {
+      await addColumnIfNotExists(tx, "tasks", "comments", "TEXT");
+      await addColumnIfNotExists(tx, "tasks", "notes", "TEXT");
+      await addColumnIfNotExists(tx, "projects", "owner_name", "VARCHAR(255)");
+      await addColumnIfNotExists(tx, "projects", "description", "TEXT");
+      await addColumnIfNotExists(tx, "assets", "model", "VARCHAR(128)");
+      await tx.execute("INSERT INTO schema_migrations (version) VALUES (?)", ["003_add_task_comments_notes_and_fields"]);
+    });
+    console.log("[Database Migration] Successfully applied 003_add_task_comments_notes_and_fields.");
+  }
 }

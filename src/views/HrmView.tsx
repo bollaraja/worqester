@@ -224,6 +224,7 @@ export const HrmView: React.FC = () => {
           {[
             { id: "dashboard", label: "HR Dashboard", count: null },
             { id: "employees", label: "Employees Directory", count: employees.length },
+            { id: "departments", label: "Departments & Org Chart", count: departments.length },
             { id: "attendance", label: "Attendance Log", count: attendance.length },
             { id: "leave", label: "Leave Requests", count: kpis.pendingLeaves },
             { id: "recruitment", label: "Recruitment (ATS)", count: kpis.openPositionsCount },
@@ -275,8 +276,8 @@ export const HrmView: React.FC = () => {
         </div>
       </div>
 
-      {/* VIEW: HR DASHBOARD */}
-      {activeSubView === "dashboard" && (
+      {/* VIEW: HR DASHBOARD & DEPARTMENTS */}
+      {(activeSubView === "dashboard" || activeSubView === "departments") && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 flex items-center justify-between">

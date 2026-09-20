@@ -47,10 +47,10 @@ export function DataTable<T extends { id: string }>({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const filteredData = useMemo(() => {
-    return data.filter((item) => {
+    return (data || []).filter((item) => {
       if (!searchTerm) return true;
       if (searchField) {
-        return searchField(item).toLowerCase().includes(searchTerm.toLowerCase());
+        return (searchField(item) || "").toLowerCase().includes(searchTerm.toLowerCase());
       }
       return JSON.stringify(item).toLowerCase().includes(searchTerm.toLowerCase());
     });

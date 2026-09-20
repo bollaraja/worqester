@@ -478,7 +478,7 @@ export const HrmView: React.FC = () => {
             data={attendance}
             columns={attendanceColumns}
             searchPlaceholder="Search attendance by employee name..."
-            searchField={(a) => a.employeeName}
+            searchField={(a) => a.employeeName || ""}
           />
         </div>
       )}
@@ -486,8 +486,13 @@ export const HrmView: React.FC = () => {
       {/* VIEW: LEAVE MANAGEMENT */}
       {activeSubView === "leave" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {leaves.map((lv) => (
+          {(leaves || []).length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
+              No leave requests submitted yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(leaves || []).map((lv) => (
               <div
                 key={lv.id}
                 className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-3"
@@ -534,7 +539,8 @@ export const HrmView: React.FC = () => {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -855,44 +861,50 @@ export const HrmView: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {expenses.map((exp) => (
-              <div
-                key={exp.id}
-                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white">{exp.employeeName}</span>
-                  <StatusBadge status={exp.status} size="sm" />
-                </div>
-                <div className="text-slate-300">{exp.description}</div>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 font-mono">
-                  <span className="text-slate-500">{exp.category} • {exp.date}</span>
-                  <strong className="text-emerald-400 text-sm">{formatCurrency(exp.amount)}</strong>
-                </div>
-
-                {exp.status === "Pending" && (
-                  <div className="flex items-center gap-2 pt-1 border-t border-slate-800/40">
-                    <button
-                      type="button"
-                      onClick={() => updateExpenseStatus(exp.id, "Approved")}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <Check size={11} />
-                      <span>Approve</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateExpenseStatus(exp.id, "Rejected")}
-                      className="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-[10px] font-semibold transition-colors cursor-pointer"
-                    >
-                      Reject
-                    </button>
+          {(expenses || []).length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
+              No expense claims submitted yet. Click "+ Submit Claim" above to file an expense.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(expenses || []).map((exp) => (
+                <div
+                  key={exp.id}
+                  className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white">{exp.employeeName}</span>
+                    <StatusBadge status={exp.status} size="sm" />
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  <div className="text-slate-300">{exp.description}</div>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 font-mono">
+                    <span className="text-slate-500">{exp.category} • {exp.date}</span>
+                    <strong className="text-emerald-400 text-sm">{formatCurrency(exp.amount, settings?.currency || "INR", settings?.currencySymbol || "₹")}</strong>
+                  </div>
+
+                  {exp.status === "Pending" && (
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-800/40">
+                      <button
+                        type="button"
+                        onClick={() => updateExpenseStatus(exp.id, "Approved")}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check size={11} />
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateExpenseStatus(exp.id, "Rejected")}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600/20 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-500/30 text-[10px] font-semibold transition-colors cursor-pointer"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -914,50 +926,56 @@ export const HrmView: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {assets.map((ast) => (
-              <div
-                key={ast.id}
-                className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2 shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-blue-400">
-                    {ast.assetCode || `AST-${ast.id.slice(-4)}`}
-                  </span>
+          {(assets || []).length === 0 ? (
+            <div className="text-center py-12 text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
+              No hardware assets registered yet. Click "Register Asset" above to record company equipment.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(assets || []).map((ast) => (
+                <div
+                  key={ast.id}
+                  className="p-4 rounded-xl bg-slate-900/90 border border-slate-800/80 text-xs space-y-2 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-blue-400">
+                      {ast.assetCode || `AST-${ast.id.slice(-4)}`}
+                    </span>
                     <div className="flex items-center gap-1.5">
-                    <StatusBadge status={ast.status} size="sm" />
-                    <button
-                      type="button"
-                      onClick={() => setEditingAsset(ast)}
-                      className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                      title="Edit asset"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteAsset(ast.id)}
-                      className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                      title="Delete asset"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                      <StatusBadge status={ast.status} size="sm" />
+                      <button
+                        type="button"
+                        onClick={() => setEditingAsset(ast)}
+                        className="p-1 rounded text-slate-400 hover:text-blue-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Edit asset"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteAsset(ast.id)}
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Delete asset"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                  <h4 className="font-bold text-white">{ast.name}</h4>
+                  <div className="text-slate-400 text-[11px] font-mono">
+                    Assigned to:{" "}
+                    <span className="text-slate-200 font-semibold">
+                      {ast.assignedToName || ast.employeeName || "Unassigned"}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono pt-1 flex items-center justify-between">
+                    <span>Serial: {ast.serialNumber}</span>
+                    <span className="text-slate-400">Cond: {ast.condition}</span>
                   </div>
                 </div>
-                <h4 className="font-bold text-white">{ast.name}</h4>
-                <div className="text-slate-400 text-[11px] font-mono">
-                  Assigned to:{" "}
-                  <span className="text-slate-200 font-semibold">
-                    {ast.assignedToName || ast.employeeName || "Unassigned"}
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-500 font-mono pt-1 flex items-center justify-between">
-                  <span>Serial: {ast.serialNumber}</span>
-                  <span className="text-slate-400">Cond: {ast.condition}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
